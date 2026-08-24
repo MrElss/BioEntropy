@@ -1,0 +1,14 @@
+# Minimum runtime dependencies. Lower bounds keep installs flexible.
+#
+# For a REPRODUCIBLE release build (so a reviewer recreates identical figures),
+# pin exact versions on your build machine after a known-good build:
+#     .venv_build\Scripts\python -m pip freeze > requirements_lock.txt
+# and install from requirements_lock.txt for that release.
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+scikit-learn>=1.4
+matplotlib>=3.8
+openpyxl>=3.1
+xlsxwriter>=3.2
+plotly>=5.22

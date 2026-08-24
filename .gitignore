@@ -1,0 +1,60 @@
+# Local editor state
+.vscode/
+.idea/
+
+# Secrets / local config (never commit)
+config.json
+**/config.json
+.env
+*.key
+
+# Test / pytest artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Python caches
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments created locally
+.venv/
+venv/
+env/
+BioEntropy_Final_Package/.venv_build/
+BioEntropy_Final_Package/.venv_run/
+
+# PyInstaller and generated desktop binaries
+BioEntropy_Final_Package/build/
+BioEntropy_Final_Package/dist/
+*.spec.tmp
+
+# Generated BioEntropy outputs
+BioEntropy_Output/
+HedgesG_smoke_outputs/
+**/BioEntropy_Results*/
+**/BioEntropy_HedgesG_Forest*/
+**/figures_auxiliary/
+**/analysis_report.html
+**/analysis_report.md
+**/explanation.json
+**/Hedges_g_effect_size_results.xlsx
+**/Hedges_g_Method_Note.md
+
+# Archives and logs
+*.zip
+*.7z
+*.rar
+*.log
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Raw research data may contain non-public clinical/animal data.
+# Keep this commented to keep the local data folder available for development
+# in a private repository. Uncomment before creating a public repository.
+# data/

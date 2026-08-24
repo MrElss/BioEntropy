@@ -1,0 +1,26 @@
+# Conservative lint config: catch real problems (undefined names, unused
+# imports, bare excepts, obvious bugs) without imposing churny style rules on
+# the large legacy modules. Tighten over time.
+line-length = 140
+target-version = "py311"
+
+[lint]
+select = [
+    "F",    # pyflakes: undefined names, unused imports, f-string issues
+    "E9",   # syntax errors
+    "B",    # flake8-bugbear: likely bugs (incl. B902, mutable defaults)
+    "PLE",  # pylint errors
+]
+# `from module import *` is used deliberately in the layered re-export chain.
+ignore = [
+    "F403",  # 'import *' used
+    "F405",  # name may be undefined / from star imports
+    "B008",  # function call in default argument (used intentionally in places)
+    # Low-value style noise on the large legacy modules; tighten over time.
+    "B905",  # zip() without explicit strict=
+    "B007",  # loop control variable not used in body
+]
+
+[lint.per-file-ignores]
+# Tests construct edge cases and use star-imported fixtures.
+"tests/*" = ["F811", "E402"]

@@ -1,0 +1,67 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>BioEntropy 输入说明</title>
+<style>
+body{font-family:Arial,'Microsoft YaHei UI',sans-serif;max-width:1000px;margin:24px auto;line-height:1.65;color:#222;padding:0 18px}
+code{background:#f4f4f4;padding:2px 5px;border-radius:4px}
+table{border-collapse:collapse;width:100%;margin:14px 0}
+th,td{border:1px solid #ddd;padding:8px 10px;text-align:left}
+th{background:#f5f7fb}
+.small{color:#666;font-size:13px}
+h1,h2{color:#1f4e79}
+</style></head><body>
+<h1>BioEntropy 输入文件命名与填写格式说明（V6）</h1>
+
+<h2>1. 实验时间点文件命名规则</h2>
+<p>实验数据文件请命名为：<code>实验号-周数W.xlsx</code></p>
+<table><tr><th>示例</th><th>含义</th></tr>
+<tr><td>106-0W.xlsx</td><td>106 实验，0 周</td></tr>
+<tr><td>106-24W.xlsx</td><td>106 实验，24 周</td></tr>
+<tr><td>109-18W.xlsx</td><td>109 实验，18 周</td></tr></table>
+<p>表格格式：第 1 列 <code>Group</code>，第 2 列 <code>Sample ID</code>，后面为各指标列。</p>
+<p class="small">动物实验或非纵向单文件数据也可直接上传，例如 <code>DB鼠.xlsx</code>、<code>KK鼠.xlsx</code>、<code>地鼠.xlsx</code>；软件会自动按 0W 单时间点实验处理。</p>
+<p class="small">单时间点实验没有真实 Week 维度，结果图会自动使用不同给药组作为横坐标。</p>
+
+<h2>2. 真实 Normal 样本文件命名规则（可选）</h2>
+<p>如果你手头有真实的 Normal/健康样本，请额外上传：<code>实验号-Normal.xlsx</code></p>
+<table><tr><th>示例</th><th>含义</th></tr>
+<tr><td>106-Normal.xlsx</td><td>为 106 实验提供真实 Normal 样本</td></tr>
+<tr><td>109-Normal.xlsx</td><td>为 109 实验提供真实 Normal 样本</td></tr></table>
+<p class="small">软件允许同一实验上传多个 Normal 样本文件；会自动合并。</p>
+<p class="small">当提供真实 Normal 样本时，软件可计算 NMD（True-Normal robust distance）：越低越接近 Normal；原始协方差距离会保留为追溯列。</p>
+
+<h2>3. 外部 Normal 区间文件命名规则（可选）</h2>
+<p>如果你没有真实 Normal 样本，但有外部参考区间，请上传：<code>实验号-NormalRange.xlsx</code>（也兼容 <code>实验号-Normal.xlsx</code> 的区间格式）。</p>
+<p class="small">这类文件只提供 <code>Normal_min</code> / <code>Normal_max</code>，不会被当作真正的 Normal 样本去估计协方差；软件会输出 NRBS/NRPS。</p>
+
+<h2>4. 真实 Normal 样本文件填写格式</h2>
+<table><tr><th>列名</th><th>说明</th></tr>
+<tr><td>Group</td><td>建议填写 Normal</td></tr>
+<tr><td>Sample ID</td><td>样本编号</td></tr>
+<tr><td>第 3 列起</td><td>每个真实 Normal 样本的指标值；一行代表 1 个 Normal 样本</td></tr></table>
+
+<h2>5. 外部区间文件填写格式</h2>
+<p>支持两种格式：</p>
+<ol>
+<li>宽表：两行分别填写 <code>Normal_min</code> 和 <code>Normal_max</code>；</li>
+<li>长表：列名包含 <code>Feature</code>、<code>Normal_min</code>、<code>Normal_max</code>。</li>
+</ol>
+
+<h2>6. 分析解释边界</h2>
+<ul>
+<li>没有任何 Normal 参考时：主要输出 Entropy 和 BRI（相对锚定周变化）。</li>
+<li>实验数据内含 Normal/健康组时：软件会自动把该组作为 in-file Normal 参考云，输出稳健封顶 NMD；动物实验通常走这个模式。</li>
+<li>有独立真实 Normal 样本文件时：输出稳健封顶 NMD，适合解释“离真实 Normal 有多远”。</li>
+<li>只有外部区间时：输出 NRBS/NRPS，适合解释“离上传的正常区间有多远”。</li>
+<li>主 Entropy 会根据数据条件选择方法：没有 Normal 参考时使用高置信异常值收缩后的稳健协方差熵；有 NMD 时使用 Normal-reference state entropy。原始协方差熵保留在 <code>Entropy_raw</code>。</li>
+</ul>
+<h2>7. 输出图说明</h2>
+<ul>
+<li><code>figures</code> 文件夹只保留 9 个主图/主文件，顺序为：马氏距离/疾病偏离度真实值、马氏距离/疾病偏离度归一化值、熵真实值、熵归一化值、二维柱形图、可旋转 3D HTML、真实值可点击走势点图、归一化可点击走势点图、药物机制驱动指标图。</li>
+<li><code>figures_auxiliary</code> 文件夹会额外输出差异化辅助图：治疗反应排序图、响应分解图、双热图、交互式 response landscape。状态/走势类图统一放在主图 7 和主图 8，避免重复。</li>
+<li>动物实验或单时间点实验的横坐标为给药组/处理组；临床纵向实验的横坐标为 Week。</li>
+<li>归一化展示同时覆盖疾病偏离度和 Entropy：有 Normal/健康组和 model/模型组时，先生成可追溯的线性锚定值（normal control = 0、model control = 100），主展示图再使用 gamma=3 的治疗窗口增强值拉开高疾病负担区间；真实判断仍看原始数值、线性锚定值、置信区间和统计检验。</li>
+<li>组别显示顺序无需手动输入：桌面端会自动检测每个实验有哪些组，并在文件识别区域生成“图中组别顺序”列表；按住组名上下拖动即可调整主图、辅助图和归一化展示表的显示顺序。</li>
+<li>如果没有真实 Normal 参考，第一张主图会使用 BRI/HDI 作为基线参考疾病偏离度；只有存在 Normal 参考时才严格解释为 True-Normal NMD。</li>
+</ul>
+</body></html>
