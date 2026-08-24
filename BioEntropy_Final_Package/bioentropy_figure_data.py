@@ -19,6 +19,7 @@ column holding its number, with the formula used to derive it.
 """
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -193,6 +194,23 @@ def _annotation_frame(comparisons: Any, weeks: List[int], diff_cols: List[str],
 # --------------------------------------------------------------------------- #
 # main entry point
 # --------------------------------------------------------------------------- #
+
+def _bar_frame(sub: pd.DataFrame, multi_week: bool, groups: List[str],
+               cols: Dict[str, Any], order: Optional[List[str]] = None) -> pd.DataFrame:
+    """One bar/marker table for a figure, in the figure's own group order."""
+    bc: Dict[str, Any] = {"Group": sub["Group"]}
+    if multi_week:
+        bc["Week"] = sub["Week"]
+    if "n" in sub.columns:
+        bc["n"] = sub["n"]
+    bc.update(cols)
+    df = pd.DataFrame(bc)
+    seq = order if order is not None else groups
+    df["_o"] = df["Group"].map({g: i for i, g in enumerate(seq)}).fillna(999)
+    df = df.sort_values(["Week", "_o"] if multi_week else ["_o"]).drop(columns=["_o"])
+    return df.reset_index(drop=True)
+
+
 def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List[Path]:
     """Write the plotted numbers for every value-bearing main figure."""
     out_root = Path(output_dir) / FIGURE_DATA_DIRNAME
@@ -241,18 +259,7 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
         disp_e_gamma = _plots._normalize_display_window(sub["Entropy"], sub["Group"])
         disp_e_lin = _plots._normalize_anchor_linear_0_100(sub["Entropy"], sub["Group"])
 
-        def _bar_frame(cols: Dict[str, Any], order: Optional[List[str]] = None) -> pd.DataFrame:
-            bc: Dict[str, Any] = {"Group": sub["Group"]}
-            if multi_week:
-                bc["Week"] = sub["Week"]
-            if "n" in sub.columns:
-                bc["n"] = sub["n"]
-            bc.update(cols)
-            df = pd.DataFrame(bc)
-            seq = order if order is not None else groups
-            df["_o"] = df["Group"].map({g: i for i, g in enumerate(seq)}).fillna(999)
-            df = df.sort_values(["Week", "_o"] if multi_week else ["_o"]).drop(columns=["_o"])
-            return df.reset_index(drop=True)
+        bar_frame = partial(_bar_frame, sub, multi_week, groups)
 
         # ================= Figure 01 : raw disease deviation ================ #
         burden_pts = _collect_points(sample_level, exp, base, groups, weeks, multi_week)
@@ -270,7 +277,7 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
         if se:
             f1[f"{short}_bootstrap_SE"] = sub[se]
         s1 = f"Fig01_{short}_raw"
-        _emit(exp_dir, s1, _bar_frame(f1), burden_pts, multi_week, written,
+        _emit(exp_dir, s1, bar_frame(f1), burden_pts, multi_week, written,
               bar_value_col=f"{short}_mean_plotted")
         _map(exp, "图01", f"柱高/折线点（{short} 组均值）", f"{s1}_bars.csv",
              f"{short}_mean_plotted", f"该组所有样本 {short} 的算术平均")
@@ -293,7 +300,7 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
                                           multi_week, normalize="display")
         s2 = f"Fig02_{short}_normalized"
         _emit(exp_dir, s2,
-              _bar_frame({f"{short}_raw": sub[bcol],
+              bar_frame({f"{short}_raw": sub[bcol],
                           "Linear_anchored_0_100": disp_b_lin,
                           "Display_plotted_0_100_gamma3": disp_b_gamma}),
               burden_pts_disp, multi_week, written,
@@ -315,7 +322,7 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
             if c in sub.columns:
                 f3[name] = sub[c]
         s3 = "Fig03_Entropy_raw"
-        _emit(exp_dir, s3, _bar_frame(f3), ent_pts, multi_week, written,
+        _emit(exp_dir, s3, bar_frame(f3), ent_pts, multi_week, written,
               bar_value_col="Entropy_plotted")
         _map(exp, "图03", "柱高/折线点（系统熵）", f"{s3}_bars.csv", "Entropy_plotted",
              "组内多指标分布的对数行列式熵 H=½·log[(2πe)^p·|Σ|]，Σ 为 Ledoit–Wolf 收缩估计")
@@ -338,7 +345,7 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
                                        normalize="display")
         s4 = "Fig04_Entropy_normalized"
         _emit(exp_dir, s4,
-              _bar_frame({"Entropy_raw": sub["Entropy"],
+              bar_frame({"Entropy_raw": sub["Entropy"],
                           "Linear_anchored_0_100": disp_e_lin,
                           "Display_plotted_0_100_gamma3": disp_e_gamma}),
               ent_pts_disp, multi_week, written,
@@ -351,7 +358,7 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
         # ================= Figure 05 : grouped bar ========================== #
         s5 = f"Fig05_{short}_Entropy_grouped_bar"
         _emit(exp_dir, s5,
-              _bar_frame({f"{short}_raw_label": sub[bcol],
+              bar_frame({f"{short}_raw_label": sub[bcol],
                           f"{short}_bar_height_0_100": disp_b_gamma,
                           "Entropy_raw_label": sub["Entropy"],
                           "Entropy_bar_height_0_100": disp_e_gamma}),
@@ -375,13 +382,13 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
             rank = {g: i + 1 for i, g in enumerate(order)}
             s7 = f"Fig07_{short}_Entropy_state_raw"
             _emit(exp_dir, s7,
-                  _bar_frame({"Plot_order_x": sub["Group"].map(rank),
+                  bar_frame({"Plot_order_x": sub["Group"].map(rank),
                               f"y_{short}_raw": sub[bcol],
                               "Entropy_reference_only": sub["Entropy"]}, order=order),
                   burden_pts, multi_week, written, bar_value_col=f"y_{short}_raw")
             s8 = f"Fig08_{short}_Entropy_state_normalized"
             _emit(exp_dir, s8,
-                  _bar_frame({"Plot_order_x": sub["Group"].map(rank),
+                  bar_frame({"Plot_order_x": sub["Group"].map(rank),
                               f"y_{short}_linear_0_100": disp_b_lin,
                               "Entropy_reference_only": sub["Entropy"]}, order=order),
                   _collect_points(sample_level, exp, base, groups, weeks, multi_week,
@@ -402,7 +409,7 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
             # ============ Figure 08 : weekly state panels =================== #
             s8 = f"Fig08_{short}_Entropy_weekly_state_panels"
             _emit(exp_dir, s8,
-                  _bar_frame({"x_Entropy": sub["Entropy"], f"y_{short}": sub[bcol]}),
+                  bar_frame({"x_Entropy": sub["Entropy"], f"y_{short}": sub[bcol]}),
                   burden_pts, multi_week, written, bar_value_col=f"y_{short}")
             _map(exp, "图08", "每周每组的气泡（x=熵, y=负担）", f"{s8}_bars.csv",
                  f"x_Entropy / y_{short}", "该周该组的熵与负担均值")
