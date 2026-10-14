@@ -1,13 +1,13 @@
 {
   "product": "BioEntropy",
   "version": "V1.0",
-  "release_tag": "v1.0.3",
+  "release_tag": "V1.0",
   "release_date": "2026-10-14",
   "windows_file_version": "1.0.3.0",
   "executable": {
     "name": "BioEntropy_V1_0.exe",
-    "bytes": 146240568,
-    "sha256": "1cf26a39c548ba6c4622403bedbb2edd1d881c40a8ed9c4a20467e4d9c1a76dd"
+    "bytes": 146238832,
+    "sha256": "83947311d2c6653b5f131dffdef2ca31cba5b5d2f6f77d362f127044933a02c9"
   },
   "validation": {
     "tests_passed": 162,
@@ -20,8 +20,6 @@
     "source_windows_entropy_summaries_equal": true,
     "output_preserves_summary": true,
     "embedded_sources_match_checkout": true,
-    "bilingual_si_pages": 8,
-    "bilingual_si_editable_equations": 13,
     "reference_numeric_equivalence": "passed",
     "actual_study_106_numeric_cells_equal": 142108,
     "baseline_starts_equal_nonzero": true,
@@ -74,9 +72,5 @@
     "BioEntropy_Final_Package/requirements_dev_lock.txt": "3128818b8ff42729c907c4e7d3a7284d6168501d53da6228d384e6d40ac55aef",
     "BioEntropy_Final_Package/requirements_lock.txt": "062f0dad5c71a54aabcb837d231d4c49978fc5fa8312ff8dacc715647e2c13ca",
     "BioEntropy_Final_Package/version_info.txt": "764785d6fa4b2b984c1235f26338c38564f442c572c2512775a22067c86a3ed3"
-  },
-  "supplementary_methods": {
-    "BioEntropy_V1.0_SI_CN.docx": "c5eb692330ff70838eabe25842d0a94a783442736909f37ed3c29b340c6f1bcd",
-    "BioEntropy_V1.0_SI_EN.docx": "de55ec85650c347b019dd6f90a46d9bb86a04cca8e324cc83b2a07e6c77b2334"
   }
 }

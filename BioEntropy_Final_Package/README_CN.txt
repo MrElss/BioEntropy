@@ -32,7 +32,7 @@ Entropy_covariance 单独保留群体协方差熵。距离衍生分数与 NMD �
 NMD等个体散点与组折线/柱形共用组汇总值拟合的归一化锚点。
 因截断和三次方变换，归一化组值不必等于散点平均值；熵图只显示组指标，不再叠加个体对数距离散点。
 本次仅修正显示和图形数据，原始指标、区间和统计结果保持不变。
-软件名称仍为BioEntropy V1.0，发行标识v1.0.3、Windows文件版本1.0.3.0用于区分本次修订。
+最终公开版本为BioEntropy V1.0。期刊正文与Supporting Information单独维护，不包含在软件仓库及下载包中。
 
 四、复现与说明
 requirements_lock.txt 记录 Python 3.12 的固定分析依赖；requirements_build_lock.txt 记录构建依赖。

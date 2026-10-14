@@ -1,8 +1,8 @@
 # BioEntropy V1.0 — Methods and Formulas
 
-This file is the single source of truth for the indices BioEntropy computes and
-their statistical treatment. Code comments and the auto-generated report should
-defer to it. Notation: a group `g` has `n` samples on `p` common numeric
+This technical reference describes the indices implemented in BioEntropy and
+their statistical treatment. The source and run audit records identify the
+implementation and parameters used for an analysis. Notation: a group `g` has `n` samples on `p` common numeric
 features; `Σ_g` is the group covariance; `μ̂, Σ̂` are estimated from a Normal
 reference of `m` samples.
 
@@ -100,15 +100,12 @@ outputs are exploratory, and are not the treatment-comparison p-values.
 healthy reference subjects themselves carry (the same full-covariance Mahalanobis
 transform applied to the Normal cloud): healthy per-subject central 95% range
 (p2.5–p97.5) and the group mean with a bootstrap CI. It describes distances in the fitted Normal reference and does not establish
-statistical equivalence to Normal. On chronic-disease
-lab panels the treated arms typically stay well above it (e.g. exp 105 ≈ 7.7–9.6
-vs a healthy band of ≈ 0.9–4.0), so it is surfaced as a compact note on the
-weekly state small-multiples (§2c) rather than shaded on the main NMD trajectory,
-where an all-empty band far below the data would only compress the axis.
+statistical equivalence to Normal. The fitted-reference summaries are
+reported with the weekly state display rather than used as an equivalence threshold.
 
 ### 2c. Weekly state small-multiples
 
-An alternative clinical trajectory view (main figure 11): one panel per week, with
+An alternative clinical trajectory view (main figure 08): one panel per week, with
 each arm placed as a bubble in the (entropy, burden) state plane on axes shared
 across all panels, so the week-to-week march is directly comparable. Diseased
 corner is top-right, healthy corner bottom-left; a thin connector plus a

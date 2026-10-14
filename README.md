@@ -26,8 +26,8 @@ See [Methods](BioEntropy_Final_Package/METHODS.md), the
 
 ## Windows application
 
-[Download BioEntropy V1.0](https://github.com/MrElss/BioEntropy/releases/tag/v1.0.3)
-for the Windows application, source archive, supplementary methods and checksums.
+[Download BioEntropy V1.0](https://github.com/MrElss/BioEntropy/releases/tag/V1.0)
+for the Windows application, source archive, usage documentation and checksums.
 
 Unpack the Windows distribution and run `BioEntropy_V1_0.exe`.
 The interface displays **BioEntropy V1.0**. Analysis results are saved in a dated
@@ -60,7 +60,7 @@ analysis and verify the species and units of any reference ranges.
 
 The forest module's individual-endpoint inputs use one column per group; its
 multivariate inputs use one row per animal. These input formats are documented
-separately in the supplementary methods.
+separately in the technical methods document.
 
 Tables and figures are exported with a sibling audit directory containing input
 hashes, software and method identifiers, environment information and advisory QC.
@@ -92,20 +92,14 @@ of its plotted points. Entropy is displayed at group level; log-distance subject
 points are not overlaid as individual entropy observations. Raw metrics and
 statistical results are unchanged by these display rules.
 
-The application name remains BioEntropy V1.0. Release `v1.0.3` and Windows file
-version `1.0.3.0` identify this display correction.
+The final GitHub release is **BioEntropy V1.0**. The software is a companion
+tool for journal research. The manuscript and journal Supporting Information
+are maintained separately and are not distributed with this repository or release.
 
-## Supplementary methods
-
-- [中文 SI](docs/SI_CN.md)
-- [English SI](docs/SI_EN.md)
-- Word documents: [中文](docs/BioEntropy_V1.0_SI_CN.docx) / [English](docs/BioEntropy_V1.0_SI_EN.docx)
-
-The supplementary methods describe software calculations. Each study must report
-its actual sample sizes, selected markers, reference groups, settings and contrasts.
-Composite pooling across different marker panels requires a comparability argument
-and sensitivity analyses. Distance-derived scores are mathematically related to
-NMD and should not be interpreted as independent validation.
+Each study must document its sample sizes, selected markers, reference groups,
+settings and contrasts. Composite pooling across different marker panels needs
+a comparability argument. Distance-derived scores are mathematically related
+to NMD and are not independent validation.
 
 ## Validation and build
 
