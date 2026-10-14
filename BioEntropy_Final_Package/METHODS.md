@@ -1,4 +1,4 @@
-# BioEntropy — Methods and Formulas (authoritative reference)
+# BioEntropy V1.0 — Methods and Formulas
 
 This file is the single source of truth for the indices BioEntropy computes and
 their statistical treatment. Code comments and the auto-generated report should
@@ -31,50 +31,76 @@ shrinkage *target*, not the data. We therefore report, per group:
 | < 2        | `low`      | covariance singular/over-shrunk; compare with care |
 
 When a true Normal reference exists, the pipeline reports the
-**normal-reference state entropy** (entropy of the 1-D NMD distribution), which
-does not suffer the n/p problem.
+**normal-reference state entropy**, an entropy-like score using the second
+moment of NMD around zero:
 
-> **Circularity caveat.** The reference-state entropy is the entropy of each
-> group's NMD values, and groups further from Normal have NMD distributions that
-> are both larger and more spread out. So the reference-state entropy correlates
-> with disease deviation *almost by construction*. A positive
+```
+H_state = ½·log(mean(NMD²)) + ½·log(2πe)
+```
+
+It is not Gaussian entropy calculated from the variance of the NMD distribution:
+shifting all distances while preserving variance changes this score. It avoids
+estimating a p-dimensional covariance per group, but still depends on the fitted
+Normal reference and missing-value treatment. The primary distance is not z-capped.
+
+> **Circularity caveat.** The reference-state score directly reuses each group's
+> mean squared NMD, and is monotonic in that second moment. Associations with
+> NMD therefore have structural coupling; it is not the differential entropy of
+> the NMD distribution. A positive
 > entropy–deviation association computed with reference-state entropy is
 > therefore **not independent corroboration** of the hypothesis. The
-> **covariance** entropy (`Entropy_robust_covariance`) is the measure that is
-> independent of deviation; use it for the headline association, and report the
+> **covariance** entropy (`Entropy_robust_covariance`) does not directly reuse
+> NMD in its formula; use it for a separately defined association, and report the
 > n/p reliability alongside it. `tests/test_methodology_validation.py` pins both
 > behaviours on synthetic data.
 
+### 1a. Subject handling in V1.0
+
+Baseline transformation, default 1%/99% winsorisation and median imputation remain.
+No individual is moved toward a median or excluded because of outlier votes.
+The five methods still record >=2 consensus and >=4 strong QC flags. Flags do
+not affect covariance fitting, entropy bootstrap inputs or sample inclusion.
+Ledoit-Wolf regularizes a covariance matrix; it is not subject attenuation and
+does not automatically provide robustness to outliers. `Entropy_raw`,
+`Entropy_covariance` and the legacy alias `Entropy_robust_covariance` are equal.
+`Entropy_n_adjusted_subjects` and legacy attenuation-count fields are zero;
+`Entropy_n_strong_qc_flags` reports flagged subjects separately.
+
 ## 2. NMD — Normal-referenced Mahalanobis deviation
 
-Distance of a sample from the robust Normal envelope. Two variants are stored:
+Primary NMD uses the fitted **Ledoit-Wolf full Normal-reference covariance**:
 
-- **Diagonal (primary `NMD`)**: per-feature robust z-scores, capped at
-  `±NMD_Z_CAP`, summed in quadrature; `NMD² = Σ_j z_j²`.
-- **Full covariance (`NMD_covariance_raw`)**: `D² = (x-μ̂)ᵀ Σ̂⁻¹ (x-μ̂)`.
+```
+NMD² = (x − μ̂)ᵀ Σ̂_LW⁻¹ (x − μ̂)
+```
 
-**p-values.**
-- `NMD_p_chi2 = 1 − F_{χ²(p)}(NMD²)` — assumes the scales are *known* and
-  features independent-normal; it is **optimistic** because μ̂/scale are
-  estimated from a finite reference.
-- `NMD_cov_p_smallsample_F` — exact small-sample p-value for the full-covariance
-  distance. For a new observation versus a Normal reference of `m` samples,
+Normal-reference matching, unit harmonization, optional log1p, Normal-only
+median ± 4 MAD clipping and missing-value imputation are applied to the Normal reference.
+Normal clipping fits the reference; study observations are not clipped to these
+bounds. The primary distance uses transformed study observations with no ±8 z cap.
+`NMD_covariance_raw` is a compatibility alias of primary NMD.
 
-  ```
-  ((m − p) / (p (m − 1))) · (m / (m + 1)) · D²  ~  F(p, m − p)
-  ```
+The old diagonal score is retained as **`NMD_diagonal_capped`**: deviations from
+the fitted Normal mean are divided by the sample SD of the processed Normal
+observations, capped at ±8 and combined in quadrature. `NMD方法敏感性` reports
+group means and bootstrap intervals; `治疗比较` includes diagonal mean differences,
+intervals and exploratory Mann-Whitney p-values. These contrasts compare both
+covariance handling and capping, so they do not isolate a covariance-only effect.
 
-  (out-of-sample Hotelling T²). It is defined only when `m > p + 1`; otherwise
-  it is `NaN`, which itself signals that the covariance-based p-value is not
-  trustworthy for that reference size.
+**Reference tail areas.** `NMD_p_chi2 = chi2.sf(NMD², p)` now describes the full
+distance. `NMD_diagonal_p_chi2` retains the previous diagonal reference output.
+`NMD_p_smallsample_F` aliases `NMD_cov_p_smallsample_F`, using the existing
+predictive F scaling only for m > p + 1. Neither chi-square nor F calibration is
+exact with estimated, clipped/imputed, Ledoit-Wolf reference covariance. These
+outputs are exploratory, and are not the treatment-comparison p-values.
 
 ### 2b. Normal-reference NMD band (reported, not shaded)
 
 `compute_normal_reference_nmd_band` reports the distance-from-Normal that the
-healthy reference subjects themselves carry (the same robust-capped Mahalanobis
+healthy reference subjects themselves carry (the same full-covariance Mahalanobis
 transform applied to the Normal cloud): healthy per-subject central 95% range
-(p2.5–p97.5) and the group mean with a bootstrap CI. It is the range a treatment
-arm would have to reach to be indistinguishable from Normal. On chronic-disease
+(p2.5–p97.5) and the group mean with a bootstrap CI. It describes distances in the fitted Normal reference and does not establish
+statistical equivalence to Normal. On chronic-disease
 lab panels the treated arms typically stay well above it (e.g. exp 105 ≈ 7.7–9.6
 vs a healthy band of ≈ 0.9–4.0), so it is surfaced as a compact note on the
 weekly state small-multiples (§2c) rather than shaded on the main NMD trajectory,
@@ -179,15 +205,27 @@ HDI mirrors BRI and is excluded from the family to avoid double-counting.
 
 ## 6. Reproducibility
 
-All bootstrap/resampling uses a fixed seed (`RNG_SEED = 42`). The full pipeline
-output (tables, reports, and every figure's pixels) is pinned by
-`tests/test_regression_pipeline.py` against `tests/baseline_snapshot.json`;
-regenerate the baseline only for an *intended* methodological change and review
-the diff.
+Bootstrap and stochastic quality-control methods use a fixed seed (`RNG_SEED = 42`).
+`tests/test_public_pipeline.py` checks fixed synthetic inputs against
+`tests/public_numeric_baseline.json`, including numeric tables, workbook exports,
+figure generation, output layout and audit isolation. `test_calculation_methods.py`
+checks covariance orientation, distance formulas, extreme values, missing inputs,
+regularization and the absence of subject-level attenuation. The independent
+`reference_metric_baseline.json` fixture checks the primary and sensitivity distance
+routes and the BRI, NRBS and covariance-entropy calculations.
 
-## 7. Caveats (publication)
+Reproducibility requires the same inputs, settings, software and dependency versions.
+Rendering also depends on the installed fonts. Public synthetic checks do not replace
+study-specific validation. Run manifests record the version, method policy, source
+and input hashes, and available environment information.
 
-Exploratory visual outputs are not a substitute for a predefined statistical
-analysis plan. Define one primary endpoint (e.g. a subject-level entropy–NMD
-association with experiment as a random effect), fix it in advance, and treat
-all other outputs as exploratory.
+## 7. Interpretation
+
+The distance-derived state score is mathematically coupled to NMD. Their correlation
+does not constitute independent validation. Forest-module log-distance effect sizes
+are distinct from group covariance entropy. Cross-model pooling requires comparable
+outcome definitions; standardization alone does not establish this comparability.
+With few models, report the model-specific estimates and modified Hartung-Knapp
+intervals and treat composite pooled results as exploratory. The standalone forest
+module uses its own preprocessing and must be described separately from the main
+analysis. See the bilingual supplementary methods in `docs/` at the repository root.

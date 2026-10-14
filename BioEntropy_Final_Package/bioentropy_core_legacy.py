@@ -27,6 +27,8 @@ from bioentropy_constants import (
     WINSOR_Q_DEFAULT,
     ENTROPY_STRONG_OUTLIER_METHODS,
     NMD_Z_CAP,
+    NMD_PRIMARY_METHOD,
+    SOFTWARE_VERSION,
 )
 from bioentropy_entropy import *  # noqa: F401,F403  (entropy primitives + infer_direction)
 
@@ -428,6 +430,7 @@ NECESSARY_TABLE_KEYS: List[str] = [
     "TrueNormal终点概览",
     "Display_Normalized_Index",
     "样本级结果",
+    "NMD方法敏感性",
 ]
 
 
@@ -2603,15 +2606,16 @@ def apply_true_normal_reference(
     d2 = np.sum(z_capped * z_capped, axis=1)
     d2 = np.clip(d2, 0, None)
     md = np.sqrt(d2)
-    # Diagonal chi-square p-value: assumes the per-feature scales are KNOWN and
-    # the features independent-normal. It ignores that the scales/mean are
-    # estimated from a finite Normal reference, so it is optimistic at small m.
-    pval = 1.0 - chi2.cdf(d2, df=len(ref.features))
+    # Reference tail areas only, not calibrated confirmatory p-values. The
+    # reference is estimated, clipped/imputed and regularized by Ledoit-Wolf.
+    pval_diagonal = 1.0 - chi2.cdf(d2, df=len(ref.features))
+    pval_covariance = chi2.sf(d2_cov, df=len(ref.features))
 
-    # Small-sample-correct p-value for the FULL-covariance Mahalanobis distance.
+    # Classical predictive F reference for the full-covariance distance.
     # For a new observation vs a Normal reference of m samples and p features,
     #   ((m - p) / (p (m - 1))) * (m / (m + 1)) * D^2  ~  F(p, m - p)
-    # (out-of-sample Hotelling T^2). Defined only when m > p + 1.
+    # Exact calibration does not follow for Ledoit-Wolf/preprocessed references.
+    # Retain this exploratory approximation only when m > p + 1.
     m_ref = int(getattr(ref, "n_normal", 0))
     p_ref = len(ref.features)
     if m_ref > p_ref + 1 and p_ref >= 1:
@@ -2620,13 +2624,18 @@ def apply_true_normal_reference(
     else:
         out["NMD_cov_p_smallsample_F"] = np.full(len(df), np.nan)
 
-    out["NMD"] = md
-    out["NMD_sq"] = d2
-    out["NMD_p_chi2"] = pval
+    out["NMD"] = md_cov
+    out["NMD_sq"] = d2_cov
+    out["NMD_p_chi2"] = pval_covariance
+    out["NMD_p_smallsample_F"] = out["NMD_cov_p_smallsample_F"]
     out["NMD_covariance_raw"] = md_cov
     out["NMD_sq_covariance_raw"] = d2_cov
-    out["NMD_method"] = f"robust_diagonal_zcap_{NMD_Z_CAP:g}"
-    out["NMD_z_cap"] = NMD_Z_CAP
+    out["NMD_method"] = NMD_PRIMARY_METHOD
+    out["NMD_z_cap"] = np.nan  # No coordinate z cap on the primary distance.
+    out["NMD_diagonal_capped"] = md
+    out["NMD_sq_diagonal_capped"] = d2
+    out["NMD_diagonal_p_chi2"] = pval_diagonal
+    out["NMD_diagonal_z_cap"] = NMD_Z_CAP
     out["NMD_feature_count"] = feature_count.to_numpy(dtype=float)
     return out
 
@@ -2637,7 +2646,7 @@ def compute_normal_reference_nmd_band(
 ) -> Optional[Dict[str, float]]:
     """NMD distribution of the Normal reference subjects against their own cloud.
 
-    Applying the same robust-capped Mahalanobis transform to the Normal samples
+    Applying the same full-covariance Mahalanobis transform to the Normal samples
     yields the distance-from-Normal that *healthy* individuals themselves carry.
     This is the reference band a treatment arm would have to reach to be
     indistinguishable from Normal. Returns per-subject central range + the group
@@ -2777,9 +2786,9 @@ def _metric_spec(metric: str) -> dict:
             "high": "NMD_mean_ci_high",
             "p": "NMD_p_mannwhitney",
             "diff": "NMD_diff_treat_minus_comp",
-            "ylabel": "True-Normal robust distance (NMD)",
+            "ylabel": "Full-covariance Normal distance (NMD)",
             "title": "Disease-burden trajectory vs true Normal",
-            "note": "NMD is the robust capped Normal-reference distance; raw covariance distance is retained as NMD_covariance_raw. Lower values mean closer to the Normal reference cloud.",
+            "note": "Primary NMD is the Ledoit-Wolf full-covariance Normal-reference distance. NMD_diagonal_capped is the sensitivity score. Lower values mean closer to the Normal reference cloud.",
         }
     if metric == "NRBS_mean":
         return {
@@ -2963,11 +2972,16 @@ def analyze_experiment(
             z_df["NMD_sq"] = np.nan
             z_df["NMD_p_chi2"] = np.nan
             z_df["NMD_cov_p_smallsample_F"] = np.nan
+            z_df["NMD_p_smallsample_F"] = np.nan
             z_df["NMD_covariance_raw"] = np.nan
             z_df["NMD_sq_covariance_raw"] = np.nan
             z_df["NMD_method"] = ""
             z_df["NMD_z_cap"] = np.nan
             z_df["NMD_feature_count"] = 0
+            z_df["NMD_diagonal_capped"] = np.nan
+            z_df["NMD_sq_diagonal_capped"] = np.nan
+            z_df["NMD_diagonal_p_chi2"] = np.nan
+            z_df["NMD_diagonal_z_cap"] = np.nan
 
         if external_range_params:
             penalty_df, nrbs, nrps, nr_cov = compute_external_normal_range_scores(raw_df, external_range_params)
@@ -3000,9 +3014,10 @@ def analyze_experiment(
             r_lo, r_hi, r_se = bootstrap_mean_ci(sub["NRBS"].dropna().values, n_boot=200, seed=_boot_seed(1750, week, group)) if sub["NRBS"].notna().sum() >= 2 else (float("nan"), float("nan"), float("nan"))
             rp_lo, rp_hi, rp_se = bootstrap_mean_ci(sub["NRPS"].dropna().values, n_boot=200, seed=_boot_seed(1800, week, group)) if sub["NRPS"].notna().sum() >= 2 else (float("nan"), float("nan"), float("nan"))
             md_lo, md_hi, md_se = bootstrap_mean_ci(sub["NMD"].dropna().values, n_boot=200, seed=_boot_seed(1850, week, group)) if sub["NMD"].notna().sum() >= 2 else (float("nan"), float("nan"), float("nan"))
+            diagonal_lo, diagonal_hi, _ = bootstrap_mean_ci(sub["NMD_diagonal_capped"].dropna().values, n_boot=200, seed=_boot_seed(1850, week, group)) if sub["NMD_diagonal_capped"].notna().sum() >= 2 else (float("nan"), float("nan"), float("nan"))
             ent_cov = ent
             ent_ref = float("nan")
-            ent_method = "robust_covariance_entropy"
+            ent_method = "ledoitwolf_covariance_entropy"
             if sub["NMD"].notna().sum() >= 2:
                 nmd_values = sub["NMD"].dropna().to_numpy(dtype=float)
                 ent_ref = compute_distance_state_entropy(nmd_values)
@@ -3051,6 +3066,8 @@ def analyze_experiment(
                     "n": len(sub),
                     "Entropy_raw": ent_raw,
                     "Entropy_robust_covariance": ent_cov,
+                    "Entropy_covariance": ent_cov,
+                    "Entropy_covariance_method": "ledoitwolf_no_subject_attenuation",
                     "Entropy_reference_state": ent_ref,
                     "Entropy_method": ent_method,
                     "Entropy": ent,
@@ -3060,6 +3077,8 @@ def analyze_experiment(
                     "Entropy_n_high_confidence_outliers": ent_info["n_entropy_outliers"],
                     "Entropy_pct_high_confidence_outliers": ent_info["pct_entropy_outliers"],
                     "Entropy_outlier_policy": ent_info["entropy_outlier_rule"],
+                    "Entropy_n_adjusted_subjects": 0,
+                    "Entropy_n_strong_qc_flags": int(strong_consensus.sum()),
                     "Entropy_cov_n_samples": ent_info.get("entropy_n", len(sub)),
                     "Entropy_cov_feature_count": ent_info.get("entropy_p", len(features)),
                     "Entropy_cov_n_over_p": ent_info.get("entropy_n_over_p", float("nan")),
@@ -3093,6 +3112,11 @@ def analyze_experiment(
                     "NMD_method": sub["NMD_method"].dropna().astype(str).iloc[0] if "NMD_method" in sub.columns and sub["NMD_method"].dropna().shape[0] > 0 else "",
                     "NMD_z_cap": float(sub["NMD_z_cap"].dropna().iloc[0]) if "NMD_z_cap" in sub.columns and sub["NMD_z_cap"].dropna().shape[0] > 0 else float("nan"),
                     "NMD_covariance_raw_mean": float(sub["NMD_covariance_raw"].mean()) if "NMD_covariance_raw" in sub.columns and sub["NMD_covariance_raw"].notna().sum() > 0 else float("nan"),
+                    "NMD_diagonal_capped_mean": float(sub["NMD_diagonal_capped"].mean()),
+                    "NMD_diagonal_capped_mean_ci_low": diagonal_lo,
+                    "NMD_diagonal_capped_mean_ci_high": diagonal_hi,
+                    "NMD_diagonal_z_cap": NMD_Z_CAP if sub["NMD"].notna().any() else float("nan"),
+                    "Calculation_version": SOFTWARE_VERSION,
                     "NRBS_mean": float(sub["NRBS"].mean()) if sub["NRBS"].notna().sum() > 0 else float("nan"),
                     "NRBS_median": float(sub["NRBS"].median()) if sub["NRBS"].notna().sum() > 0 else float("nan"),
                     "NRBS_sd": float(sub["NRBS"].std(ddof=1)) if sub["NRBS"].notna().sum() > 1 else float("nan"),
@@ -3147,6 +3171,15 @@ def analyze_experiment(
             else:
                 nmd_diff = nmd_lo = nmd_hi = p_nmd = float("nan")
 
+            if s1["NMD_diagonal_capped"].notna().sum() >= 2 and s2["NMD_diagonal_capped"].notna().sum() >= 2:
+                diag1 = s1["NMD_diagonal_capped"].dropna().values
+                diag2 = s2["NMD_diagonal_capped"].dropna().values
+                diagonal_diff = float(np.mean(diag1) - np.mean(diag2))
+                _, p_diagonal = mannwhitneyu(diag1, diag2, alternative="two-sided")
+                diagonal_diff_lo, diagonal_diff_hi, _ = bootstrap_diff_ci(diag1, diag2, np.mean, n_boot=400, seed=RNG_SEED + 2550 + week)
+            else:
+                diagonal_diff = diagonal_diff_lo = diagonal_diff_hi = p_diagonal = float("nan")
+
             if s1["NRBS"].notna().sum() >= 2 and s2["NRBS"].notna().sum() >= 2:
                 nrbs_diff = float(s1["NRBS"].mean() - s2["NRBS"].mean())
                 try:
@@ -3173,7 +3206,7 @@ def analyze_experiment(
             ent_lo, ent_hi, p_ent = bootstrap_diff_ci(
                 X1_entropy, X2_entropy, lambda a: compute_group_entropy(a.copy()), n_boot=300, seed=RNG_SEED + 3000 + week
             )
-            entropy_method = "robust_covariance_entropy"
+            entropy_method = "ledoitwolf_covariance_entropy"
             if s1["NMD"].notna().sum() >= 2 and s2["NMD"].notna().sum() >= 2:
                 nmd1 = s1["NMD"].dropna().to_numpy(dtype=float)
                 nmd2 = s2["NMD"].dropna().to_numpy(dtype=float)
@@ -3210,6 +3243,10 @@ def analyze_experiment(
                     "NMD_diff_ci_low": nmd_lo,
                     "NMD_diff_ci_high": nmd_hi,
                     "NMD_p_mannwhitney": p_nmd,
+                    "NMD_diagonal_capped_diff_treat_minus_comp": diagonal_diff,
+                    "NMD_diagonal_capped_diff_ci_low": diagonal_diff_lo,
+                    "NMD_diagonal_capped_diff_ci_high": diagonal_diff_hi,
+                    "NMD_diagonal_capped_p_mannwhitney": p_diagonal,
                     "NRBS_diff_treat_minus_comp": nrbs_diff,
                     "NRBS_diff_ci_low": nrbs_lo,
                     "NRBS_diff_ci_high": nrbs_hi,
@@ -3576,6 +3613,14 @@ def _analyze_all_base(
     if not nr_feature_cmp_all.empty:
         tables["Normal范围指标比较"] = nr_feature_cmp_all
 
+    if not summary_all.empty and summary_all["NMD_mean"].notna().any():
+        tables["NMD方法敏感性"] = summary_all.loc[summary_all["NMD_mean"].notna(), [
+            "Experiment", "Week", "Group", "n", "Calculation_version", "NMD_method",
+            "NMD_mean", "NMD_mean_ci_low", "NMD_mean_ci_high",
+            "NMD_diagonal_capped_mean", "NMD_diagonal_capped_mean_ci_low",
+            "NMD_diagonal_capped_mean_ci_high", "NMD_diagonal_z_cap",
+        ]].copy()
+
     return {"experiments": exp_results, "tables": tables}
 
 
@@ -3604,11 +3649,13 @@ def _build_markdown_report_ranged(results: Dict[str, Any]) -> str:
     base = _build_markdown_report_base(results)
     lines = [base, "\n\n## 独立 Normal 样本文件模块补充说明\n"]
     lines.append("- 本版本支持上传 **真实的独立 Normal/健康样本文件**，例如 `106-Normal.xlsx`、`109-Normal.xlsx`。")
-    lines.append("- 当检测到这类文件时，软件会在与各时间点共同存在的指标上构建真正的 Normal 多变量参考云；主 NMD 使用 **稳健封顶 Normal-reference distance**，原始 LedoitWolf 协方差距离保留在 `NMD_covariance_raw`。")
+    lines.append("- 当检测到这类文件时，软件会在共同指标上构建 Normal 参考云；主 NMD 使用 **Ledoit–Wolf 全协方差马氏距离**，对角封顶版本保留在 `NMD_diagonal_capped`，组水平比较见 `NMD方法敏感性` 表。")
     lines.append("- 在此基础上新增：")
-    lines.append("  - **NMD（True-Normal robust distance）**：样本到真实 Normal 参考云的稳健封顶距离，**越低越健康**；")
+    lines.append("  - **NMD（Full-covariance distance）**：样本到真实 Normal 参考云的全协方差距离，越低表示越接近该参考。")
     lines.append("  - **deviation-from-Normal heatmap**：显示治疗组相对比较组，哪些指标更接近真实 Normal。")
-    lines.append("- NMD 定义为样本相对真实 Normal 参考云的多变量偏离度；越低表示越接近 Normal 参考状态。为避免小样本 Normal 方差过小导致单个指标支配结果，主 NMD 对单指标 z 偏离做封顶处理。")
+    lines.append("- 本版主 NMD 不作 ±8 单指标封顶；该封顶仅用于对角敏感性分数。两种分数的差异同时涉及协方差和封顶。chi-square/F 输出均为未经精确校准的探索性参考。")
+    lines.append("- 协方差熵保留共同预处理与 Ledoit–Wolf 正则化，取消额外 0.5 个体坐标收缩；异常检测仅用于 QC。`Entropy_raw`、`Entropy_covariance`、旧别名 `Entropy_robust_covariance` 在本版相等。")
+    lines.append("- 有可用 NMD 时，主 Entropy 仍使用其二阶矩状态分数，与 NMD 存在结构性耦合；本次方法升级不把这种相关性变成独立证据。")
 
     tables = results.get("tables", {})
     tn_params = tables.get("TrueNormal参数", pd.DataFrame())
@@ -3739,7 +3786,7 @@ h1,h2{color:#1f4e79}
 <tr><td>106-Normal.xlsx</td><td>为 106 实验提供真实 Normal 样本</td></tr>
 <tr><td>109-Normal.xlsx</td><td>为 109 实验提供真实 Normal 样本</td></tr></table>
 <p class="small">软件允许同一实验上传多个 Normal 样本文件；会自动合并。</p>
-<p class="small">当提供真实 Normal 样本时，软件可计算 NMD（True-Normal robust distance）：越低越接近 Normal；原始协方差距离会保留为追溯列。</p>
+<p class="small">当提供真实 Normal 样本时，软件可计算 NMD（True-Normal robust distance）：越低越接近 Normal；对角封顶距离另存用于敏感性比较。</p>
 
 <h2>3. 外部 Normal 区间文件命名规则（可选）</h2>
 <p>如果你没有真实 Normal 样本，但有外部参考区间，请上传：<code>实验号-NormalRange.xlsx</code>（也兼容 <code>实验号-Normal.xlsx</code> 的区间格式）。</p>
@@ -3761,10 +3808,10 @@ h1,h2{color:#1f4e79}
 <h2>6. 分析解释边界</h2>
 <ul>
 <li>没有任何 Normal 参考时：主要输出 Entropy 和 BRI（相对锚定周变化）。</li>
-<li>实验数据内含 Normal/健康组时：软件会自动把该组作为 in-file Normal 参考云，输出稳健封顶 NMD；动物实验通常走这个模式。</li>
-<li>有独立真实 Normal 样本文件时：输出稳健封顶 NMD，适合解释“离真实 Normal 有多远”。</li>
+<li>实验数据内含 Normal/健康组时：软件把该组作为 in-file Normal 参考云，输出 Ledoit–Wolf 全协方差 NMD。</li>
+<li>有独立真实 Normal 样本文件时：输出全协方差 NMD；对角封顶距离另存用于敏感性比较。</li>
 <li>只有外部区间时：输出 NRBS/NRPS，适合解释“离上传的正常区间有多远”。</li>
-<li>主 Entropy 会根据数据条件选择方法：没有 Normal 参考时使用高置信异常值收缩后的稳健协方差熵；有 NMD 时使用 Normal-reference state entropy。原始协方差熵保留在 <code>Entropy_raw</code>。</li>
+<li>有至少两个有效 NMD 且状态分数有限时，主 Entropy 使用 Normal-reference state entropy；否则使用 Ledoit–Wolf 协方差熵。取消额外 0.5 个体收缩，异常检测仅用于 QC；协方差熵保留在 <code>Entropy_covariance</code>，旧别名仍输出。</li>
 </ul>
 <h2>7. 输出图说明</h2>
 <ul>
@@ -3803,8 +3850,8 @@ def build_excel_template(out_path: Path) -> Path:
     demo_rows = [
         ["Placebo", 1, 8.9, 2.5, 1.0, 1.7, 5.4, 4.4, 48, 55, 33, 2.1, 8.4],
         ["Placebo", 2, 9.3, 2.6, 0.9, 1.9, 5.7, 4.8, 45, 50, 36, 1.8, 8.8],
-        ["DrugA", 1, 8.0, 2.2, 1.1, 1.4, 4.9, 3.8, 39, 47, 29, 1.3, 7.6],
-        ["DrugA", 2, 7.7, 2.1, 1.2, 1.3, 4.7, 3.5, 37, 45, 27, 1.1, 7.3],
+        ["DrugA", 3, 8.0, 2.2, 1.1, 1.4, 4.9, 3.8, 39, 47, 29, 1.3, 7.6],
+        ["DrugA", 4, 7.7, 2.1, 1.2, 1.3, 4.7, 3.5, 37, 45, 27, 1.1, 7.3],
     ]
     for row in demo_rows:
         ws.append(row)
@@ -3817,7 +3864,7 @@ def build_excel_template(out_path: Path) -> Path:
     note["A1"] = "BioEntropy 实验数据模板说明"
     note["A1"].font = Font(bold=True, size=14)
     note["A3"] = "1. 文件命名请使用：实验号-周数W.xlsx，例如 106-12W.xlsx。"
-    note["A4"] = "2. 第一列 Group，第二列 Sample ID。"
+    note["A4"] = "2. 第一列 Group，第二列 Sample ID；同一文件内 ID 必须唯一，包括不同分组之间。"
     note["A5"] = "3. 第三列起为指标值；不同时间点尽量保持相同指标名称。"
     note["A6"] = "4. 真实 Normal 样本请另存为：实验号-Normal.xlsx。"
     note["A7"] = "5. 外部 min/max 区间请另存为：实验号-NormalRange.xlsx。"
@@ -4275,7 +4322,7 @@ def build_markdown_report(results: Dict[str, Any]) -> str:
     if isinstance(coverage_df, pd.DataFrame) and not coverage_df.empty:
         lines.append("\n### Normal coverage 解释")
         lines.append("- **Normal coverage** 表示：在给定阈值下，落在稳健 Normal 参考包络内的样本比例。")
-        lines.append("- 95% coverage 使用 χ²(0.95, df=k) 阈值；99% coverage 使用 χ²(0.99, df=k) 阈值，其中 k 为进入 NMD 的特征数；主 NMD 已做单指标封顶，因此 coverage 是近似参考。")
+        lines.append("- 95%/99% coverage 使用 χ²(0.95/0.99, df=k) 阈值，其中 k 为进入 NMD 的特征数。参考协方差经估计、预处理与正则化，coverage 仅为近似描述，不能视为已验证的健康等价检验。")
         lines.append("- 它回答的是“有多少样本进入 Normal 参考包络附近”，不是治愈率，也不能单独替代疾病严重程度判断。")
         for exp in sorted(coverage_df["Experiment"].astype(str).unique().tolist()):
             sub = coverage_df[coverage_df["Experiment"].astype(str) == exp]
@@ -4600,7 +4647,7 @@ def plot_true_normal_md_entropy_scatter(summary_df: pd.DataFrame, experiment: st
             bbox=dict(boxstyle="round,pad=0.22", facecolor="white", edgecolor="#dddddd", alpha=0.92),
             fontsize=9,
         )
-    ax.set_xlabel("True-Normal robust distance (NMD)")
+    ax.set_xlabel("Full-covariance Normal distance (NMD)")
     ax.set_ylabel("Entropy")
     ax.set_title(f"Experiment {experiment}: NMD vs Entropy", fontsize=13, pad=12)
     _format_axis(ax)

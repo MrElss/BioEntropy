@@ -14,8 +14,7 @@ from sklearn.neighbors import LocalOutlierFactor
 
 from bioentropy_constants import (
     RNG_SEED,
-    ENTROPY_STRONG_OUTLIER_METHODS,
-    ENTROPY_OUTLIER_SHRINK,
+    ENTROPY_SUBJECT_POLICY,
 )
 
 __all__ = [
@@ -132,48 +131,23 @@ def compute_group_entropy_with_diagnostics(X: np.ndarray) -> Tuple[float, Dict[s
     return float(0.5 * logdet + 0.5 * k * np.log(2 * np.pi * np.e)), diag
 
 
-def prepare_entropy_matrix(
-    X: np.ndarray,
-    min_methods: int = ENTROPY_STRONG_OUTLIER_METHODS,
-    shrink: float = ENTROPY_OUTLIER_SHRINK,
-) -> Tuple[np.ndarray, Dict[str, Any]]:
-    """Attenuate only high-confidence multivariate outliers before entropy.
+def prepare_entropy_matrix(X: np.ndarray) -> Tuple[np.ndarray, Dict[str, Any]]:
+    """Keep all baseline-preprocessed subjects without coordinate attenuation.
 
-    The QC table still reports the broader consensus rule (>=2 methods).  Entropy
-    uses a stricter rule so isolated biological extremes are not over-removed.
+    Missing values retain the existing median imputation. Outlier voting is
+    performed separately for QC; flags cannot affect the entropy matrix.
+    The legacy count keys now count adjusted subjects and are always zero.
     """
-    X = fill_nan_with_col_median(np.asarray(X, dtype=float))
-    n = len(X)
-    if n == 0:
-        return X, {
-            "n_entropy_outliers": 0,
-            "pct_entropy_outliers": 0.0,
-            "entropy_outlier_rule": f">={min_methods} of 5 methods, shrink={shrink}",
-        }
-
-    flags = detect_outliers_methods(X)
-    if not flags:
-        method_count = np.zeros(n, dtype=int)
-    else:
-        method_count = np.column_stack([flags[k] for k in flags]).sum(axis=1)
-    strong = method_count >= min_methods
-
-    X_adj = X.copy()
-    if strong.any():
-        non_strong = X_adj[~strong]
-        center_source = non_strong if len(non_strong) >= max(3, X_adj.shape[1] // 2) else X_adj
-        center = np.nanmedian(center_source, axis=0)
-        center = np.where(np.isfinite(center), center, 0.0)
-        X_adj[strong] = center.reshape(1, -1) + shrink * (X_adj[strong] - center.reshape(1, -1))
-
-    return X_adj, {
-        "n_entropy_outliers": int(strong.sum()),
-        "pct_entropy_outliers": float(100 * strong.mean()) if n > 0 else 0.0,
-        "entropy_outlier_rule": f">={min_methods} of 5 methods, shrink={shrink}",
+    X = fill_nan_with_col_median(np.asarray(X, dtype=float)).copy()
+    return X, {
+        "n_entropy_outliers": 0,
+        "pct_entropy_outliers": 0.0,
+        "entropy_outlier_rule": ENTROPY_SUBJECT_POLICY,
     }
 
 
 def compute_group_entropy_robust(X: np.ndarray) -> Tuple[float, np.ndarray, Dict[str, Any]]:
+    """Legacy API name for Ledoit-Wolf entropy without subject attenuation."""
     X_adj, info = prepare_entropy_matrix(X)
     entropy, diag = compute_group_entropy_with_diagnostics(X_adj)
     info.update(diag)

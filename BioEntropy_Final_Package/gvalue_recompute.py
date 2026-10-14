@@ -1287,11 +1287,9 @@ def run_part3(repo_root: str, all_warns: List[str], all_flagged: List[FlaggedVal
 # indicator is dropped before complete-casing.
 MAHA_DROP_MISSING_FRAC = 0.20
 
-# Robust headline: cap each standardised value at ±this many Control-SDs before
-# the distance, so no single extreme endpoint (e.g. insulin, or a tiny-Control-SD
-# marker) dominates. ±3 SD is the standard "3-sigma" robust winsorisation
-# threshold and, empirically, minimises between-model heterogeneity here (it
-# harmonises the per-model composites rather than inflating the estimate).
+# The primary composite uses a fixed ±3 Control-SD cap on each standardised
+# value before computing distances. The unrestricted sensitivity analysis
+# retains the uncapped values.
 MAHA_WINSOR_Z = 3.0
 
 
@@ -1694,15 +1692,14 @@ def run_part4(repo_root: str, warns: List[str], flagged: List[FlaggedValue],
 # The repository defines two entropies (bioentropy_entropy.py):
 #   * compute_group_entropy        : group-level Gaussian log-det entropy.
 #   * compute_distance_state_entropy: group state entropy = 0.5·log(E[d²])+const.
-# Hedges' g needs a per-animal value, so Part 5 uses the per-animal analogue of
-# the distance-state entropy:
-#       E_i = 0.5·log(d_i²) + 0.5·log(2πe) = log(d_i) + const,
-# where d_i is the Mahalanobis distance to the Control centre (the Part-4
-# pipeline). Higher E ⇒ more disordered / farther from normal. The additive
-# constant cancels in Hedges' g, so the entropy G is the g of the log-distance
-# (an entropy/surprisal scale) — distinct from Part 4's linear-distance g and
-# robust to the tiny-Control-SD single-indicator dominance flagged there.
-# For description we also report the canonical group-level log-det entropy.
+# Hedges' g needs a per-animal value, so Part 5 uses a distance-derived score:
+#       E_i = log(max(d_i, 1e-9)) + 0.5·log(2πe),
+# where d_i is the Mahalanobis distance from the Part-4 pipeline. Higher E
+# means farther from the Control reference. The additive constant cancels in
+# Hedges' g, so the legacy "entropy G" field is the g of the log-distance.
+# This reuses the Part-4 distances and is not independent entropy evidence.
+# The mean of E_i is not the group's 0.5·log(mean(d_i²))+const state score.
+# Group-level log-det entropy is reported separately for description only.
 
 _HALF_LOG_2PIE = 0.5 * math.log(2.0 * math.pi * math.e)
 
@@ -1733,7 +1730,7 @@ def _logdet_entropy(z) -> Optional[float]:
 class EntropyModel:
     model: str
     n_indicators: int
-    group_entropy_stats: Dict[str, GroupStat]      # per-animal state entropy
+    group_entropy_stats: Dict[str, GroupStat]      # per-animal distance-derived score
     group_logdet_entropy: Dict[str, float]         # group-level log-det entropy
     htd_vs_pm: Dict[str, GResult]
     model_vs_control: Optional[GResult]
@@ -1773,7 +1770,7 @@ def _entropy_from_maha(mm: MahaModel) -> EntropyModel:
     htd_vs_pm: Dict[str, GResult] = {}
     htd_vs_model: Dict[str, GResult] = {}
     for dose in [g for g in ent if g.startswith("HTD1801")]:
-        hp = hedges_g(ent["PM"], ent[dose], "PM", dose)   # g>0 ⇒ HTD lower entropy
+        hp = hedges_g(ent["PM"], ent[dose], "PM", dose)   # g>0 ⇒ HTD lower log-distance
         if hp is not None:
             htd_vs_pm[dose] = hp
         hm = hedges_g(ent.get("Model", []), ent[dose], "Model", dose)
@@ -2259,7 +2256,7 @@ def write_part5_csv(path: str, p5: "Part5Result") -> None:
 def build_markdown_part5(p5: "Part5Result") -> str:
     lines: List[str] = []
     a = lines.append
-    a("# G-value recalculation — Part 5 (熵跨模型G值)")
+    a("# G-value recalculation — Part 5 (距离衍生熵分数跨模型G值)")
     a("")
     a(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     a("")
@@ -2267,45 +2264,51 @@ def build_markdown_part5(p5: "Part5Result") -> str:
         a(f"Part 5 skipped: {p5.reason}.")
         return "\n".join(lines)
     a("## Method")
-    a("- Per-animal state entropy E = 0.5·log(d²) + 0.5·log(2πe) (the per-animal "
-      "form of bioentropy_entropy.compute_distance_state_entropy), where d is the "
-      "Mahalanobis distance to the Control centre (Part-4 pipeline).")
-    a("- Higher entropy ⇒ more disordered / farther from normal. HTD1801 vs PM: "
-      "g = J·(mean_PM_E − mean_HTD_E)/SD_pooled, g>0 ⇒ HTD1801 lowers the entropy "
-      "(restores order) more than PM.")
-    a("- Group-level log-det Gaussian entropy (compute_group_entropy) reported per "
-      "group as a descriptive check.")
+    a("- The legacy entropy field is a distance-derived per-animal score: "
+      "E = log(max(d, 1e-9)) + 0.5·log(2πe), where d is the Mahalanobis distance "
+      "to the Control reference from the Part-4 pipeline.")
+    a("- Higher E means farther from the Control reference. HTD1801 vs PM: "
+      "g = J·(mean_PM_E − mean_HTD_E)/SD_pooled; g>0 means a lower mean "
+      "log-distance score in HTD1801 than in PM.")
+    a("- This score reuses the Part-4 distances and is not independent evidence "
+      "of system entropy. Its group mean is not the main pipeline's group state "
+      "score, 0.5·log(mean(d²)) + 0.5·log(2πe).")
+    a("- Group-level log-det Gaussian entropy is reported separately for "
+      "description; it is not used to calculate the Part-5 pooled g.")
     a(f"- Cross-model inverse-variance pool (fixed + random; random primary); "
-      f"KK-ay dose = **{p5.primary_dose}** primary, L/M sensitivity.")
+      f"KK-ay dose = **{p5.primary_dose}** primary, L/H sensitivity.")
+    a("- Modified Hartung-Knapp (HK) intervals use t(k−1) and an adjusted "
+      "standard error no smaller than the conventional random-effects standard "
+      "error. An RE interval excluding 0 with an HK interval spanning 0 supports "
+      "a trend only; an RE interval spanning 0 is classified as uncertain.")
     a("")
 
-    a("## Cross-model pooled entropy G (HTD1801 vs PM)")
+    a("## Cross-model pooled distance-derived entropy G (HTD1801 vs PM)")
     a("")
-    a("| KK dose | k | Random g [95% CI] | Fixed g [95% CI] | I² |")
-    a("|---|---|---|---|---|")
+    a("| KK dose | k | Random g [95% CI] | Modified HK 95% CI | Fixed g [95% CI] | I² | Support |")
+    a("|---|---|---|---|---|---|---|")
     for dose in PART3_KK_DOSES:
         p = p5.pools.get(dose)
         if not p:
             continue
         fx, rd = p
         tag = " (primary)" if dose == p5.primary_dose else ""
+        hk = (f"[{_fmt(rd.hk_ci_low)}, {_fmt(rd.hk_ci_high)}]"
+              if rd.hk_ci_low is not None else "not available")
         a(f"| {dose}{tag} | {rd.k} | "
           f"{_fmt(rd.estimate)} [{_fmt(rd.ci_low)}, {_fmt(rd.ci_high)}] | "
-          f"{_fmt(fx.estimate)} [{_fmt(fx.ci_low)}, {_fmt(fx.ci_high)}] | {_fmt(rd.i2,1)}% |")
+          f"{hk} | {_fmt(fx.estimate)} [{_fmt(fx.ci_low)}, {_fmt(fx.ci_high)}] | "
+          f"{_fmt(rd.i2,1)}% | {classify_support(rd)} |")
     a("")
     if p5.primary_pool is not None:
         rd = p5.primary_pool[1]
-        verdict = ("HTD1801 superior to PM" if rd.ci_low > 0 else
-                   "PM superior" if rd.ci_high < 0 else
-                   "no significant difference (CI spans 0)")
-        a(f"**Headline (random, KK={p5.primary_dose}):** g = {_fmt(rd.estimate)} "
-          f"[{_fmt(rd.ci_low)}, {_fmt(rd.ci_high)}], k={rd.k}, I²={_fmt(rd.i2,1)}% → {verdict}.")
+        a(_verdict_line("Headline: distance-derived entropy score", rd, p5.primary_dose))
         a("")
 
     for em in p5.models:
         a(f"## {em.model}  ({em.n_indicators} indicators)")
         a("")
-        a("| Group | n | state-entropy mean | state-entropy SD | group log-det entropy |")
+        a("| Group | n | distance-derived score mean | distance-derived score SD | group log-det entropy |")
         a("|---|---|---|---|---|")
         for g in ("Control", "Model", "HTD1801", "HTD1801-L", "HTD1801-M",
                   "HTD1801-H", "PM"):
@@ -2320,9 +2323,9 @@ def build_markdown_part5(p5: "Part5Result") -> str:
               f"({'modeling established' if r.ci_low > 0 else 'weak/questionable'})")
         if em.pm_vs_model:
             r = em.pm_vs_model
-            a(f"- PM vs Model (entropy reduction): g = {_fmt(r.g)} [{_fmt(r.ci_low)}, {_fmt(r.ci_high)}]")
+            a(f"- PM vs Model (log-distance score reduction): g = {_fmt(r.g)} [{_fmt(r.ci_low)}, {_fmt(r.ci_high)}]")
         for dose, r in em.htd_vs_model.items():
-            a(f"- HTD1801 vs Model ({dose}, entropy reduction): g = {_fmt(r.g)} "
+            a(f"- HTD1801 vs Model ({dose}, log-distance score reduction): g = {_fmt(r.g)} "
               f"[{_fmt(r.ci_low)}, {_fmt(r.ci_high)}]")
         a("")
         a("| HTD arm | HTD1801 vs PM g | SE | 95% CI |")
@@ -2691,7 +2694,7 @@ def _panelA_pipeline(ax):
     ax.axis("off")
     steps = ["Raw data\n(per animal)", "Part 1\nper-model\nendpoint G",
              "Part 2\nwithin-model\npooled G", "Part 3\ncross-model\nendpoint pooled G",
-             "Parts 4–5\nMahalanobis /\nentropy pooled G"]
+             "Parts 4–5\nMahalanobis /\nlog-distance G"]
     n = len(steps)
     bw, gap = 1.62, (10 - 1.62 * n) / (n - 1)
     for i, s in enumerate(steps):
@@ -2795,7 +2798,7 @@ def _make_panel_figure(result, out_path, figs):
     tag(axD, "d")
     _forest_on_ax(axE, rows_e, xlim=shared_xlim,
                   title="Parts 4–5 · cross-model pooled G (Mahalanobis & entropy)",
-                  method_note="Per-model g → random-effects meta; winsorised = primary",
+                  method_note="Entropy = distance-derived log score; winsorised = primary",
                   ann_frac=1.5, num_fs=7.2)
     tag(axE, "e")
 
@@ -2811,7 +2814,7 @@ def _make_panel_figure(result, out_path, figs):
     fig.legend(handles=legend, loc="lower center", ncol=5, frameon=False, fontsize=8.0,
                bbox_to_anchor=(0.5, 0.028))
     fig.text(0.5, 0.004, "Pooling: random-effects (DerSimonian–Laird). Annotations give the "
-             "standard RE 95% CI and the Hartung–Knapp (HK) 95% CI with a tier: robust = HK "
+             "standard RE 95% CI and the modified Hartung–Knapp (HK) 95% CI with a tier: robust = HK "
              "excludes 0; trend = RE excludes 0 but HK crosses 0; uncertain = RE crosses 0. "
              "KK-ay uses the medium dose.", ha="center", va="bottom", fontsize=7.2,
              color="#76808C")
@@ -2927,9 +2930,9 @@ def _make_figures(result: Dict[str, object], fig_dir: str) -> List[str]:
                  "unrestricted = sensitivity", figs, ann_frac=1.6)
     _save_forest(_composite_rows(result, ("Entropy",)),
                  os.path.join(fig_dir, "Figure_Part5_entropy.png"),
-                 "Part 5 · cross-model pooled G · entropy",
+                 "Part 5 · cross-model pooled G · distance-derived entropy",
                  "Per-model g → RE meta; winsorised (±3 SD, valid endpoints) = primary, "
-                 "unrestricted = sensitivity", figs, ann_frac=1.6)
+                  "unrestricted = sensitivity; entropy = log-distance + constant", figs, ann_frac=1.6)
     p4 = result["part4"]
     if getattr(p4, "available", False):
         _contribution_plot(p4.models, os.path.join(fig_dir, "Figure_Supp_contributions.png"), figs)
@@ -3048,9 +3051,15 @@ def build_main_summary(result: Dict[str, object], fdr_rows, ast_sens: Dict[str, 
     a(f"- 星号数据默认**保留**（ASTERISK_MODE={ASTERISK_MODE}）；是否剔除需经确认，见 QC 表与排除/保留敏感性。")
     a("- 复合评分（马氏距离/熵）**主结果=稳健版**（winsor 截尾 + 仅纳入“有效客观指标”），"
       "不受限版作为敏感性。")
+    a("- 本模块的“熵”是距离衍生分数 E = ln(max(d, 1e-9)) + 0.5 ln(2πe)，"
+      "其 pooled g 来自个体对数马氏距离，不是群体协方差熵，也不构成独立于马氏距离的熵证据。"
+      "该分数的组均值不等于主分析流程的 0.5 ln(mean(d²)) + 0.5 ln(2πe)。")
     a("- 仅当 Model vs Control 的变化方向与疾病逻辑一致时，该指标才纳入主分析；"
-      "胰岛素/体重/摄食/饮水等需人工确认（needs_manual_review），暂不进入主结果。")
-    a("- 跨模型合并同时给出标准随机效应与 **Hartung-Knapp（HK）** 95% CI；HK CI 跨 0 时按“趋势”解读。")
+      "胰岛素和体重按升高为不利的预设方向接受同一检查；摄食量、饮水量及体重变化率等情境依赖指标"
+      "需人工复核（needs_manual_review），默认不进入主结果。")
+    a("- 跨模型合并同时给出标准随机效应与 **修正 Hartung-Knapp（HK）** 95% CI；"
+      "修正标准误不小于常规随机效应标准误。仅常规区间不跨 0、HK 区间跨 0 时按“趋势”解读；"
+      "常规区间也跨 0 时为“不确定”。")
     a("")
 
     # ---- MAIN results table ----

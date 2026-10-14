@@ -9,5 +9,5 @@ if not "%EC%"=="0" (
   pause
   exit /b %EC%
 )
-echo Build complete. EXE should be in dist\BioEntropy_Desktop.exe
+echo Build complete. EXE should be in dist\BioEntropy_V1_0.exe
 pause

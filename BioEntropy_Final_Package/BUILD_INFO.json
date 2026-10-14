@@ -1,0 +1,8 @@
+{
+  "software_name": "BioEntropy",
+  "calculation_version": "V1.0",
+  "release_date": "2026-10-13",
+  "method_revision": "full-covariance-primary-no-subject-attenuation-1",
+  "primary_nmd": "ledoitwolf_full_covariance",
+  "subject_attenuation": false
+}

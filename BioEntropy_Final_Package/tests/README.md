@@ -1,36 +1,20 @@
-# BioEntropy tests
+# BioEntropy V1.0 tests
 
-Run from `BioEntropy_Final_Package/`:
+Run `python -m pip install -r requirements_dev.txt` and `python -m pytest tests/ -q`
+from the application directory. `ruff check .` runs the configured static checks.
 
-```bash
-pip install -r requirements_dev.txt
-pytest tests/ -q
-```
+The public suite includes analytical NMD checks, covariance-entropy invariants,
+Hedges' g formulas, input validation, reference ranges, quality-control behavior,
+fixed synthetic numeric regression, workbook and figure exports, output layout,
+and audit isolation. `test_calculation_methods.py` checks the primary and diagonal
+sensitivity routes against an independent synthetic reference fixture.
 
-## What is covered
+`public_numeric_baseline.json` defines the current synthetic numeric contract.
+`reference_metric_baseline.json` is an independent synthetic comparison fixture.
+Do not regenerate numeric fixtures to conceal an unexpected change. Review the
+method and the resulting differences before accepting any intentional revision.
 
-| File | Scope |
-|------|-------|
-| `test_hedges_g.py` | Hedges' g formula, J small-sample correction, sign/antisymmetry, edge cases |
-| `test_infer_direction.py` | Disease-burden sign convention, incl. the `non-HDL` harmful-vs-beneficial regression guard |
-| `test_entropy.py` | System-entropy estimator invariants (scale-equivariance, monotonicity), NaN handling |
-| `test_regression_pipeline.py` | End-to-end pipeline output pinned to a committed baseline |
-
-## Regression baseline
-
-`_regression_snapshot.py` runs the real desktop pipeline
-(`load_input_bundle → analyze_all → build_markdown_report → generate_output_bundle`)
-on the bundled animal-experiment data and hashes the numeric result tables, the
-markdown report, and the output-bundle structure into `baseline_snapshot.json`.
-
-`test_regression_pipeline.py` asserts the current output still matches that
-baseline. This is the safety net that makes core-module refactors (e.g. dead-code
-removal) verifiable. If you make an **intentional** scientific change, regenerate
-the baseline:
-
-```bash
-python tests/_regression_snapshot.py tests/baseline_snapshot.json
-```
-
-and review the diff before committing. The test skips automatically if the raw
-data folder is absent (e.g. stripped for a public release).
+Some input-specific checks require external research files and skip when those
+files are absent. Research data and private regression snapshots are not distributed.
+The source and Windows executable also support `--self-test <report.json>` using
+synthetic inputs to exercise loading, analysis, table/figure export and run records.

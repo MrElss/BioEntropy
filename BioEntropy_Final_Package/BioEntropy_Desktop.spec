@@ -2,6 +2,8 @@
 from PyInstaller.utils.hooks import collect_all
 
 datas = [('bioentropy_core_generalized.py', '.'), ('bioentropy_core_legacy.py', '.'), ('gvalue_recompute.py', '.'),('bioentropy_constants.py', '.'), ('bioentropy_entropy.py', '.'), ('bioentropy_display_state.py', '.'), ('bioentropy_plots.py', '.')]
+datas += [('bioentropy_audit.py', '.'), ('BUILD_INFO.json', '.'), ('METRIC_DICTIONARY.md', '.')]
+datas += [('bioentropy_selftest.py', '.'), ('METHODS.md', '.'), ('ANALYSIS_GUIDE.md', '.')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('matplotlib')
@@ -39,7 +41,8 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='BioEntropy_Desktop',
+    name='BioEntropy_V1_0',
+    version='version_info.txt',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

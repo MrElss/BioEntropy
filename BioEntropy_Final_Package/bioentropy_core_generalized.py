@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 
+import logging
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -87,6 +88,26 @@ def build_input_guide_html(out_path: Path) -> Path:
         .replace(old_norm, new_norm)
         .replace(old_order, new_order)
     )
+    text = text.replace(
+        "后面为各指标列。</p>",
+        "后面为各指标列；每行一个样本，数值型 ID 在同一文件中须全局唯一，包括不同组之间。</p>",
+    ).replace(
+        "没有任何 Normal 参考时：主要输出 Entropy 和 BRI（相对锚定周变化）。",
+        "没有真实 Normal 样本时：有可匹配的上传/内置参考范围则使用 NRBS；否则使用相对最早时间点的 BRI。",
+    ).replace(
+        "如果没有真实 Normal 参考，第一张主图会使用 BRI/HDI 作为基线参考疾病偏离度；只有存在 Normal 参考时才严格解释为 True-Normal NMD。",
+        "第一张主图的负担指标优先级为 NMD > NRBS > BRI；只有存在真实 Normal 参考时才解释为 True-Normal NMD。",
+    ).replace(
+        new_figures,
+        "<li><code>figures</code> 根据实验类型保留主图：多时间点通常为 8 个，单时间点通常为 9 个；包含原值、归一化展示、联合展示、3D HTML、状态图和机制驱动图。</li>",
+    )
+    text = text.replace("</body></html>", (
+        "<h2>8. 运行记录与质量提示</h2>"
+        "<p>结果同级的 <code>*_audit</code> 目录保存运行记录、质量提示和指标字典；不修改已有结果，也不写入原 ZIP。</p>"
+        "<p>reference-state entropy 使用 <code>mean(NMD²)</code>，与 NMD 存在结构性耦合；协方差熵保留在 "
+        "<code>Entropy_robust_covariance</code>。请核查全缺失样本、参考单位和成人范围适用性。</p>"
+        "</body></html>"
+    ))
     path.write_text(text, encoding="utf-8")
     return path
 
@@ -277,7 +298,7 @@ def _append_joint_visual_artifacts(results: Dict[str, Any], bundle: Dict[str, An
     bundle["figure_paths"] = figure_paths
 
 
-def generate_output_bundle(results: Dict[str, Any], package_name: str = "BioEntropy_Results", explanation_options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def generate_output_bundle(results: Dict[str, Any], package_name: str = "BioEntropy_Results", explanation_options: Optional[Dict[str, Any]] = None, *, audit_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     old_group_order_map = _dstate.DISPLAY_GROUP_ORDER_MAP
     _dstate.DISPLAY_GROUP_ORDER_MAP = dict((explanation_options or {}).get("group_order_map") or results.get("group_order_map") or {})
     try:
@@ -291,15 +312,30 @@ def generate_output_bundle(results: Dict[str, Any], package_name: str = "BioEntr
 
         # Per-figure numbers (bar heights and every scatter point) so the main
         # figures can be redrawn in GraphPad Prism from the exported values.
+        export_issues = []
         try:
             from bioentropy_figure_data import export_figure_data_tables
             bundle["figure_data_files"] = [
                 str(x) for x in export_figure_data_tables(results, output_dir)
             ]
-        except Exception:
+        except Exception as exc:
             bundle["figure_data_files"] = []
+            export_issues.append(f"figure_data: {type(exc).__name__}: {exc}")
+            logging.getLogger(__name__).exception("Optional figure-data export failed")
 
         _refresh_zip(output_dir, Path(bundle["zip_path"]))
+        # Sidecar metadata is deliberately outside output_dir and the legacy ZIP.
+        # Any audit failure is reported without discarding the completed analysis.
+        try:
+            from bioentropy_audit import write_audit_bundle
+            context = dict(audit_context or {})
+            context["display_options"] = dict(explanation_options or {})
+            context["display_options"]["group_order_map"] = dict(_dstate.DISPLAY_GROUP_ORDER_MAP)
+            context["export_issues"] = list(context.get("export_issues", [])) + export_issues
+            bundle.update(write_audit_bundle(results, output_dir, context))
+        except Exception as exc:
+            bundle["audit_error"] = f"{type(exc).__name__}: {exc}"
+            logging.getLogger(__name__).exception("Analysis completed, but audit export failed")
         return bundle
     finally:
         _dstate.DISPLAY_GROUP_ORDER_MAP = old_group_order_map

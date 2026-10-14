@@ -54,7 +54,13 @@ HedgesG_smoke_outputs/
 Thumbs.db
 .DS_Store
 
-# Raw research data may contain non-public clinical/animal data.
-# Keep this commented to keep the local data folder available for development
-# in a private repository. Uncomment before creating a public repository.
-# data/
+# Local research inputs, outputs and runtime state
+data/
+research_data/
+validation/
+**/*_audit/
+**/BioEntropy_GValues*/
+**/.bioentropy*_desktop.json
+.ruff_cache/
+*.exe
+*.pdf

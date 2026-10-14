@@ -55,15 +55,15 @@ if not "%EC%"=="0" (
   exit /b %EC%
 )
 
-if exist "%~dp0dist\BioEntropy_Desktop.exe" (
+if exist "%~dp0dist\BioEntropy_V1_0.exe" (
   echo ============================================================
   echo  BUILD COMPLETE
   echo ------------------------------------------------------------
-  echo  EXE: "%~dp0dist\BioEntropy_Desktop.exe"
+  echo  EXE: "%~dp0dist\BioEntropy_V1_0.exe"
   echo  Double-click that file to launch BioEntropy.
   echo ============================================================
 ) else (
-  echo [WARN] Build reported success but dist\BioEntropy_Desktop.exe
+  echo [WARN] Build reported success but dist\BioEntropy_V1_0.exe
   echo        was not found. Scroll up for details.
 )
 

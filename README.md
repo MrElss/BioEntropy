@@ -1,69 +1,102 @@
-# BioEntropy
+# BioEntropy V1.0
 
-BioEntropy is a small, self-contained desktop tool for the exploratory,
-multi-index quantification of *disease deviation* and *system entropy* in
-grouped biomedical measurements (e.g. clinical laboratory panels or animal
-biochemistry). It computes, per group and per time point:
+BioEntropy is a desktop application for exploratory analysis of grouped biomedical
+measurements. It supports animal experiments and clinical data collected at multiple
+time points, with tables, figures and traceable run records.
 
-- **NMD** — a robust Normal-referenced Mahalanobis deviation (distance of a
-  group from a healthy/Normal reference cloud);
-- **System entropy** — the log-determinant (Gaussian) entropy of the group's
-  multivariate distribution, estimated with Ledoit–Wolf shrinkage;
-- Absolute (**NRBS**, published-range) or baseline-relative (**BRI**) burden
-  scores when no enrolled Normal arm is available;
-- **Hedges' g** effect sizes and random-effects pooled estimates for
-  treatment-versus-comparator contrasts.
+## Measures
 
-It is intended as a *supporting analytical utility*, not as a confirmatory
-statistical package: its correlation and pooled outputs are exploratory and
-should be interpreted alongside a pre-specified analysis plan. The exact
-definitions, equations and parameter settings are documented in
-[`BioEntropy_Final_Package/METHODS.md`](BioEntropy_Final_Package/METHODS.md).
+- **NMD** measures each subject's deviation from a Normal reference using a
+  Ledoit–Wolf full covariance matrix. A capped diagonal distance is exported as
+  a sensitivity analysis.
+- **Covariance entropy** describes the dispersion of each group's multivariate
+  measurements. The separate **distance-derived state score** summarizes the
+  second moment of NMD. The `Entropy_method` field identifies which measure is
+  selected for the main `Entropy` output.
+- **NRBS** uses supplied or built-in reference ranges. **BRI** describes burden
+  relative to the selected study baseline when a Normal reference is unavailable.
+- The separate forest module calculates **Hedges' g** and exploratory pooled
+  effects. Its preprocessing differs from the main workflow. Its per-animal
+  entropy-labelled score is a log-distance transformation, not group covariance
+  entropy or independent evidence of efficacy.
 
-## Installation
+See [Methods](BioEntropy_Final_Package/METHODS.md), the
+[metric dictionary](BioEntropy_Final_Package/METRIC_DICTIONARY.md), and the
+[analysis guide](BioEntropy_Final_Package/ANALYSIS_GUIDE.md).
 
-Requires Python 3.11+.
+## Windows application
+
+[Download BioEntropy V1.0](https://github.com/MrElss/BioEntropy/releases/tag/v1.0.0)
+for the Windows application, source archive, supplementary methods and checksums.
+
+Unpack the Windows distribution and run `BioEntropy_V1_0.exe`.
+The interface displays **BioEntropy V1.0**. Analysis results are saved in a dated
+`BioEntropy_Results_V1_0_*` directory. Settings are stored in the user's home
+directory as `.bioentropy_v1_0_desktop.json`.
+
+## Run from source
+
+Python 3.11 or newer is required. From `BioEntropy_Final_Package`, run
+`Start_Desktop.cmd` on Windows, or install the dependencies and start the program:
 
 ```bash
-cd BioEntropy_Final_Package
 python -m pip install -r requirements_desktop.txt
-```
-
-## Running
-
-Launch the desktop application:
-
-```bash
-cd BioEntropy_Final_Package
 python BioEntropy_Desktop_App.py
 ```
 
-Load one or more standardized `.xlsx` workbooks (one column per group; a
-separate `Normal.xlsx` may be supplied as a healthy reference), assign the
-treatment / comparator / reference roles, and run the analysis. Results
-(figures and result tables) are written to a timestamped output folder.
+For the fixed Python 3.12 analysis stack, use `requirements_lock.txt` in a fresh
+environment. The Windows build dependencies are listed in
+`requirements_build_lock.txt`. Reproduction also depends on the input data,
+settings, Python version and installed fonts.
 
-## Tests
+## Input and output
+
+The main workflow accepts `.xlsx` files with columns
+`Group | Sample ID | feature1 | feature2 ...`, one row per subject. Numeric subject
+identifiers must be unique within each file. Name longitudinal files
+`Experiment-0W.xlsx`, `Experiment-6W.xlsx`, and so on. Normal reference samples and
+reference ranges use the separately supplied templates. Assign group roles before
+analysis and verify the species and units of any reference ranges.
+
+The forest module's individual-endpoint inputs use one column per group; its
+multivariate inputs use one row per animal. These input formats are documented
+separately in the supplementary methods.
+
+Tables and figures are exported with a sibling audit directory containing input
+hashes, software and method identifiers, environment information and advisory QC.
+Outlier flags do not trigger subject-level attenuation or exclusion. Other defined
+preprocessing and missing-data rules still apply.
+
+## Supplementary methods
+
+- [中文 SI](docs/SI_CN.md)
+- [English SI](docs/SI_EN.md)
+- Word documents: [中文](docs/BioEntropy_V1.0_SI_CN.docx) / [English](docs/BioEntropy_V1.0_SI_EN.docx)
+
+The supplementary methods describe software calculations. Each study must report
+its actual sample sizes, selected markers, reference groups, settings and contrasts.
+Composite pooling across different marker panels requires a comparability argument
+and sensitivity analyses. Distance-derived scores are mathematically related to
+NMD and should not be interpreted as independent validation.
+
+## Validation and build
 
 ```bash
-cd BioEntropy_Final_Package
 python -m pip install -r requirements_dev.txt
-MPLBACKEND=Agg python -m pytest tests/
+python -m ruff check .
+python -m pytest tests/ -q
+python BioEntropy_Desktop_App.py --self-test selftest.json
 ```
 
-The suite includes unit tests for the numerical primitives and a regression
-test that pins the full pipeline output (tables and every figure's pixels) to a
-committed baseline.
+The suite checks analytical formulas and fixed synthetic numeric results, along
+with workbook/figure export and audit behavior. Optional tests requiring external
+research data skip when those data are absent. Build the Windows executable with
+`Rebuild_EXE.cmd` or `python bootstrap_build.py`.
 
-## Repository layout
+## Data and license
 
-- `BioEntropy_Final_Package/` — application source, methods reference, and tests.
+Research input files, study outputs, local environments and validation logs are
+excluded from the public source distribution. The included templates and public
+test fixtures contain example or synthetic data.
 
-## Data and licensing
-
-This project is released under the MIT License (see [`LICENSE`](LICENSE)).
-
-The research measurements used during development are non-public and are not
-distributed with this repository; supply your own standardized workbooks (one
-column per group, one row per subject) to run the tool. With no datasets
-present, the regression test self-skips while the unit tests run in full.
+BioEntropy is distributed under the [MIT License](LICENSE).

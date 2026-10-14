@@ -19,7 +19,7 @@ set "EC=%ERRORLEVEL%"
 if "%EC%"=="0" (
   echo.
   echo Rebuild finished successfully.
-  if exist "%~dp0dist\BioEntropy_Desktop.exe" echo EXE: "%~dp0dist\BioEntropy_Desktop.exe"
+  if exist "%~dp0dist\BioEntropy_V1_0.exe" echo EXE: "%~dp0dist\BioEntropy_V1_0.exe"
 ) else (
   echo.
   echo Rebuild failed with exit code %EC%.

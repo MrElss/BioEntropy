@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 VENV = ROOT / ".venv_build"
 REQ = ROOT / "requirements_desktop.txt"
+LOCK = ROOT / "requirements_lock.txt"
 APP = ROOT / "BioEntropy_Desktop_App.py"
 
 def vpy() -> Path:
@@ -26,7 +27,12 @@ def main():
     ensure_venv()
     py = vpy()
     run([py, "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"])
-    run([py, "-m", "pip", "install", "-r", REQ, "pyinstaller>=6.6"])
+    supports_lock = subprocess.run(
+        [str(py), "-c", "import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)"],
+        capture_output=True,
+    ).returncode == 0
+    requirement = LOCK if supports_lock and LOCK.exists() else REQ
+    run([py, "-m", "pip", "install", "-r", requirement, "pyinstaller>=6.6"])
     for folder in ["build", "dist"]:
         shutil.rmtree(ROOT / folder, ignore_errors=True)
     sep = ";" if sys.platform.startswith("win") else ":"
@@ -36,7 +42,8 @@ def main():
         "--clean",
         "--onefile",
         "--windowed",
-        "--name", "BioEntropy_Desktop",
+        "--name", "BioEntropy_V1_0",
+        "--version-file", str(ROOT / "version_info.txt"),
         "--add-data", f"bioentropy_core_generalized.py{sep}.",
         "--add-data", f"bioentropy_core_legacy.py{sep}.",
         "--add-data", f"gvalue_recompute.py{sep}.",
@@ -44,6 +51,12 @@ def main():
         "--add-data", f"bioentropy_entropy.py{sep}.",
         "--add-data", f"bioentropy_display_state.py{sep}.",
         "--add-data", f"bioentropy_plots.py{sep}.",
+        "--add-data", f"bioentropy_audit.py{sep}.",
+        "--add-data", f"BUILD_INFO.json{sep}.",
+        "--add-data", f"METRIC_DICTIONARY.md{sep}.",
+        "--add-data", f"bioentropy_selftest.py{sep}.",
+        "--add-data", f"METHODS.md{sep}.",
+        "--add-data", f"ANALYSIS_GUIDE.md{sep}.",
         "--collect-all", "matplotlib",
         "--collect-all", "sklearn",
         "--collect-all", "scipy",
@@ -53,7 +66,7 @@ def main():
         str(APP),
     ]
     run(cmd)
-    print("Build complete. EXE should be in:", ROOT / "dist" / "BioEntropy_Desktop.exe")
+    print("Build complete. EXE should be in:", ROOT / "dist" / "BioEntropy_V1_0.exe")
 
 if __name__ == "__main__":
     main()

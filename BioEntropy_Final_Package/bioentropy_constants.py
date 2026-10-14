@@ -1,15 +1,16 @@
 """Shared constants: version string, numerical parameters, figure palette."""
 from __future__ import annotations
 
-# Keep in sync with APP_VERSION in the desktop app.
-SOFTWARE_VERSION = "V1.6"
+# Shared release identifier for the desktop UI and exported records.
+SOFTWARE_VERSION = "V1.0"
 
 # Numerical / algorithm configuration (shared by the core and the entropy module).
 RNG_SEED = 42
 WINSOR_Q_DEFAULT = 0.01
-ENTROPY_STRONG_OUTLIER_METHODS = 4
-ENTROPY_OUTLIER_SHRINK = 0.5
-NMD_Z_CAP = 8.0
+ENTROPY_STRONG_OUTLIER_METHODS = 4  # QC flag only; never moves/excludes subjects.
+NMD_Z_CAP = 8.0  # Applies only to the retained diagonal sensitivity score.
+NMD_PRIMARY_METHOD = "ledoitwolf_full_covariance"
+ENTROPY_SUBJECT_POLICY = "QC only; no subject-level attenuation or exclusion"
 
 # Nature Publishing Group (NPG) qualitative palette used across all figures.
 _NPG_COLORS = [

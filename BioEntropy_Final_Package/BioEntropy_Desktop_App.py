@@ -32,10 +32,11 @@ from bioentropy_core_generalized import (
     UPLOADED_TRUE_NORMAL_LABEL,
 )
 from gvalue_recompute import analyze_gvalues
+from bioentropy_audit import capture_input_files, cleanup_generated_bundle
+from bioentropy_constants import SOFTWARE_VERSION
 
-APP_NAME = "BioEntropy 桌面版"
-# Keep in sync with SOFTWARE_VERSION in bioentropy_constants.
-APP_VERSION = "V1.6"
+APP_NAME = "BioEntropy"
+APP_VERSION = SOFTWARE_VERSION
 
 
 def ensure_dir(path: Path) -> Path:
@@ -70,6 +71,7 @@ class BioEntropyDesktopApp:
         self.role_vars: dict[str, dict[str, tk.StringVar]] = {}
         self.group_order_listboxes: dict[str, tk.Listbox] = {}
         self.last_result_dir: Path | None = None
+        self.last_audit_dir: Path | None = None
         self.last_zip_path: Path | None = None
         self.current_package_name: str | None = None
         self.is_running = False
@@ -98,7 +100,7 @@ class BioEntropyDesktopApp:
         self._poll_log_queue()
 
     def _settings_path(self) -> Path:
-        return Path.home() / ".bioentropy_desktop.json"
+        return Path.home() / ".bioentropy_v1_0_desktop.json"
 
     def _apply_saved_settings(self) -> None:
         """Restore preferences from the last session (best effort)."""
@@ -167,7 +169,7 @@ class BioEntropyDesktopApp:
 
     def default_output_dir(self) -> Path:
         # Desktop if it exists, else the working directory. No dedicated output
-        # folder: each run writes its own timestamped BioEntropy_Results_* folder.
+        # folder: each run writes its own timestamped BioEntropy_Results_V1_0_* folder.
         desktop = Path.home() / "Desktop"
         if desktop.exists():
             return desktop
@@ -360,7 +362,7 @@ class BioEntropyDesktopApp:
     # ----------------------------------------------------------- layout
     def _build_ui(self) -> None:
         self.TR = {
-            "title": ("BioEntropy 桌面版", "BioEntropy Desktop"),
+            "title": ("BioEntropy", "BioEntropy"),
             "tagline": ("多指标系统熵 · 疾病偏离度分析框架",
                         "Multi-index system entropy · disease-deviation framework"),
             "version": ("版本", "Version"),
@@ -373,7 +375,8 @@ class BioEntropyDesktopApp:
                 "BioEntropy 用于多分组、多时间点生物指标数据的疾病偏离度—熵值分析。软件可批量读取规范 Excel 文件，"
                 "自动完成共同指标识别、稳健预处理、Entropy 计算、异常值质量控制、时间趋势总结和结果导出。\n\n"
                 "如果上传真实的独立 Normal/健康样本文件（例如“实验号-Normal.xlsx”），软件会把这些样本当作真正的健康参考云，"
-                "使用稳健封顶 Normal-reference distance 计算 NMD，并保留原始协方差距离用于追溯。\n\n"
+                "使用 Ledoit–Wolf 全协方差马氏距离作为主 NMD，另存对角封顶距离用于敏感性比较。"
+                "取消强异常个体的额外 0.5 收缩，异常检测仅用于 QC；已有截尾预处理保留。\n\n"
                 "如果没有真实 Normal 样本但有外部正常区间，可上传“实验号-NormalRange.xlsx”，软件会额外输出 NRBS / NRPS。"
                 "结果包括 Excel 工作簿、9 个主图/主文件、更多辅助图、自动报告和结果解释报告，统一输出为一个结果文件夹。",
                 "BioEntropy analyses disease deviation and system entropy across multi-group, "
@@ -382,8 +385,9 @@ class BioEntropyDesktopApp:
                 "outlier QC, time-trend summaries and result export.\n\n"
                 "If you upload real independent Normal/healthy-sample files (e.g. "
                 "\"<exp>-Normal.xlsx\"), they are treated as a true healthy reference cloud and "
-                "used to compute a robustly-capped Normal-reference distance (NMD), keeping the "
-                "raw covariance distance for traceability.\n\n"
+                "used to compute a Ledoit-Wolf full-covariance distance as primary NMD, with the "
+                "capped diagonal distance retained for sensitivity comparison. Subject-level "
+                "0.5 attenuation is removed; outlier flags are QC only, with existing winsorisation retained.\n\n"
                 "Without real Normal samples but with an external normal range, upload "
                 "\"<exp>-NormalRange.xlsx\" to also get NRBS / NRPS. Output includes an Excel "
                 "workbook, 9 main figures/files, extra auxiliary figures, automatic reports and an "
@@ -1002,7 +1006,7 @@ class BioEntropyDesktopApp:
             return False
 
         existing = []
-        for pattern in ("BioEntropy_Results*",):
+        for pattern in ("BioEntropy_Results_V1_0*",):
             existing.extend([p for p in self.output_dir.glob(pattern) if p.exists()])
         # De-duplicate and ignore non-result working files
         existing = sorted(set(existing), key=lambda p: str(p).lower())
@@ -1031,7 +1035,7 @@ class BioEntropyDesktopApp:
             except Exception as exc:
                 messagebox.showerror("输出目录错误", f"无法访问新的输出目录：\n{exc}")
                 return False
-            still_existing = sorted(set(self.output_dir.glob("BioEntropy_Results*")), key=lambda p: str(p).lower())
+            still_existing = sorted(set(self.output_dir.glob("BioEntropy_Results_V1_0*")), key=lambda p: str(p).lower())
             if still_existing:
                 messagebox.showwarning(
                     "输出目录仍有旧结果",
@@ -1066,7 +1070,7 @@ class BioEntropyDesktopApp:
         if not self._handle_existing_output_items():
             return
 
-        package_name = f"BioEntropy_Results_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        package_name = f"BioEntropy_Results_V1_0_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         self.current_package_name = package_name
         explanation_options = {
             "group_order_map": group_order_map,
@@ -1101,15 +1105,17 @@ class BioEntropyDesktopApp:
         self.log("开始分析。")
         if group_order_map:
             self.log("已应用检测到/拖拽后的组别显示顺序。")
-        threading.Thread(target=self._analysis_worker, args=(package_name, role_map, winsor_q, explanation_options), daemon=True).start()
+        input_paths = tuple(self.file_paths)
+        threading.Thread(target=self._analysis_worker, args=(package_name, role_map, winsor_q, explanation_options, input_paths), daemon=True).start()
 
-    def _analysis_worker(self, package_name, role_map, winsor_q, explanation_options=None) -> None:
+    def _analysis_worker(self, package_name, role_map, winsor_q, explanation_options=None, input_paths=None) -> None:
         try:
             self.log("读取 Excel 文件……")
-            raw, range_refs, normal_refs, mixed_overview, data_overview, range_overview, normal_overview = load_input_bundle(self.file_paths)
+            uploads, input_records = capture_input_files(input_paths if input_paths is not None else tuple(self.file_paths))
+            raw, range_refs, normal_refs, mixed_overview, data_overview, range_overview, normal_overview = load_input_bundle(uploads)
             self.log("开始运行疾病偏离度—熵值分析框架……")
             if normal_overview is not None and len(normal_overview) > 0:
-                self.log(f"检测到 {len(normal_overview)} 个独立 Normal 样本文件，将计算 True-Normal robust distance (NMD)。")
+                self.log(f"检测到 {len(normal_overview)} 个独立 Normal 样本文件，将计算 Full-covariance Normal distance (NMD)。")
             if range_overview is not None and len(range_overview) > 0:
                 self.log(f"检测到 {len(range_overview)} 个外部 Normal 范围文件，将额外计算 NRBS / NRPS。")
             results = analyze_all(raw, role_map=role_map, winsor_q=winsor_q, external_range_map=range_refs, true_normal_map=normal_refs)
@@ -1120,13 +1126,32 @@ class BioEntropyDesktopApp:
                 results["tables"]["外部Normal范围文件"] = range_overview
             if (explanation_options or {}).get("group_order_map"):
                 results["group_order_map"] = (explanation_options or {}).get("group_order_map")
-            self.log("生成结果工作簿、报告、图片和解释报告……")
-            bundle = generate_output_bundle(results, package_name=package_name, explanation_options=explanation_options)
+            self.log("生成结果数据表、图片和运行记录……")
+            audit_context = {"inputs": input_records, "role_map": role_map, "winsor_q": winsor_q,
+                             "normal_reference_experiments": list(normal_refs)}
+            bundle = generate_output_bundle(results, package_name=package_name, explanation_options=explanation_options,
+                                            audit_context=audit_context)
             ensure_dir(self.output_dir)
             final_dir = self.output_dir / package_name
             if final_dir.exists():
                 shutil.rmtree(final_dir)
             shutil.copytree(bundle["output_dir"], final_dir)
+            self.last_audit_dir = None
+            if bundle.get("audit_dir"):
+                try:
+                    audit_dir = unique_path(final_dir.with_name(final_dir.name + "_audit"))
+                    shutil.copytree(bundle["audit_dir"], audit_dir)
+                    self.last_audit_dir = audit_dir
+                    self.log(f"运行记录与质量提示：{audit_dir}（{bundle.get('audit_advisory_count', 0)} 条提示）")
+                except OSError as exc:
+                    self.log(f"分析结果已保存，运行记录复制失败：{exc}；临时运行记录保留在 {bundle['audit_dir']}")
+                try:
+                    if self.last_audit_dir:
+                        cleanup_generated_bundle(bundle)
+                except OSError as exc:
+                    self.log(f"结果已保存，临时目录清理失败：{exc}")
+            elif bundle.get("audit_error"):
+                self.log(f"分析结果已生成，运行记录导出失败：{bundle['audit_error']}")
             self.last_result_dir = final_dir
             self.last_zip_path = None
             self.root.after(0, lambda: self._finish_success(final_dir))
@@ -1146,9 +1171,10 @@ class BioEntropyDesktopApp:
         messagebox.showinfo(
             "分析完成",
             "结果已经生成。\n\n"
-            "已额外生成 analysis_report.html、analysis_report.md 和 explanation.json。\n\n"
+            "图表与数据表已生成。\n\n"
             f"结果目录：\n{result_dir}\n\n"
-            "结果文件夹将自动打开。"
+            + (f"运行记录与质量提示：\n{self.last_audit_dir}\n\n" if self.last_audit_dir else "")
+            + "结果文件夹将自动打开。"
         )
         self.open_path(result_dir)
 
@@ -1260,4 +1286,7 @@ class BioEntropyDesktopApp:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "--self-test":
+        from bioentropy_selftest import run_self_test
+        sys.exit(run_self_test(sys.argv[2]))
     BioEntropyDesktopApp().run()

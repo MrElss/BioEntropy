@@ -1039,7 +1039,7 @@ def plot_true_normal_nmd_trajectory(summary_df: pd.DataFrame, experiment: str, o
         _plot_single_metric_by_group(
             sub, experiment, out_path,
             metric_col="NMD_mean",
-            ylabel="True-Normal robust distance (NMD)",
+            ylabel="Full-covariance Normal distance (NMD)",
             title=f"Experiment {experiment}: NMD by treatment group",
             note="Single-timepoint experiment: the x-axis shows treatment groups, not weeks. Lower NMD indicates closer to the Normal reference cloud.",
             treatment_group=treatment_group,
@@ -1077,7 +1077,7 @@ def plot_true_normal_nmd_trajectory(summary_df: pd.DataFrame, experiment: str, o
     ax.set_xticks(weeks)
     ax.set_xticklabels([f"{w}W" for w in weeks])
     ax.set_xlabel("Week")
-    ax.set_ylabel("True-Normal robust distance (NMD)")
+    ax.set_ylabel("Full-covariance Normal distance (NMD)")
     _legacy._format_axis(ax)
 
     if not comp.empty and treatment_group and comparator_group and len(groups) >= 2:
@@ -1101,7 +1101,7 @@ def plot_true_normal_nmd_trajectory(summary_df: pd.DataFrame, experiment: str, o
     _legacy._add_top_title_and_note(
         fig,
         title=f"Experiment {experiment}: Disease-burden trajectory vs true Normal",
-        note="NMD is the robust capped Normal-reference distance; raw covariance distance is retained as NMD_covariance_raw. Lower values indicate samples closer to the Normal cloud. X-axis follows uploaded weeks.",
+        note="Primary NMD is the Ledoit-Wolf full-covariance Normal-reference distance; NMD_diagonal_capped is the sensitivity score. Lower values indicate samples closer to the Normal cloud. X-axis follows uploaded weeks.",
         legend_handles=legend_handles,
         legend_labels=legend_labels,
         legend_ncol=min(len(legend_labels), 4),
@@ -1130,7 +1130,7 @@ def plot_true_normal_nmd_baseline_aligned(summary_df: pd.DataFrame, experiment: 
         _plot_single_metric_by_group(
             sub, experiment, out_path,
             metric_col="NMD_mean",
-            ylabel="True-Normal robust distance (NMD)",
+            ylabel="Full-covariance Normal distance (NMD)",
             title=f"Experiment {experiment}: NMD by treatment group",
             note="Single-timepoint experiment: baseline-aligned change is not applicable, so groups are compared directly on the x-axis.",
             treatment_group=treatment_group,
@@ -1393,7 +1393,7 @@ def plot_true_normal_nmd_entropy_joint_trajectory(
                 label = display_group_name(group, idx) if single_timepoint else f"{int(row['Week'])}W"
                 text_items.append((float(row["NMD_mean"]), float(row["Entropy"]), label, color))
         _legacy._annotate_points_nonoverlap(ax, text_items, fontsize=8.0)
-        ax.set_xlabel("True-Normal robust distance (NMD)")
+        ax.set_xlabel("Full-covariance Normal distance (NMD)")
         ax.set_ylabel("Entropy")
         _legacy._format_axis(ax)
         note = (
@@ -1610,14 +1610,14 @@ def _burden_metadata(burden_kind: str) -> Dict[str, str]:
             "high": "NMD_ci_high",
             "diff": "NMD_diff",
             "p": "NMD_p_boot",
-            "axis": "True-Normal robust distance (NMD)",
+            "axis": "Full-covariance Normal distance (NMD)",
             "short": "NMD",
             "prefix": "true_normal_nmd",
             "joint_title": "NMD–Entropy joint trajectory",
             "heat_title": "NMD / Entropy dual heatmap",
             "grouped_title": "Group-wise disease burden and entropy",
             "3d_title": "NMD × Entropy 3D grouped chart",
-            "note": "NMD is the robust capped Normal-reference distance; raw covariance distance is retained as NMD_covariance_raw. Lower values indicate samples closer to the Normal reference.",
+            "note": "Primary NMD is the Ledoit-Wolf full-covariance Normal-reference distance; NMD_diagonal_capped is the sensitivity score. Lower values indicate samples closer to the Normal reference.",
         }
 
 
@@ -2754,7 +2754,7 @@ def plot_state_time_small_multiples(
     band_note = ""
     if normal_band and np.isfinite(normal_band.get("median", np.nan)):
         band_note = (f"  Normal {short} ≈ {normal_band['median']:.1f} "
-                     f"(healthy 95% {normal_band.get('p2_5', float('nan')):.1f}–{normal_band.get('p97_5', float('nan')):.1f}), below the plotted range.")
+                     f"(healthy 95% {normal_band.get('p2_5', float('nan')):.1f}–{normal_band.get('p97_5', float('nan')):.1f}).")
     fig.text(0.5, -0.02,
              f"x = system entropy, y = {short} (distance from Normal). Stars: burden-gap Mann–Whitney p (*<0.05, **<0.01, ***<0.001)." + band_note,
              ha="center", va="top", fontsize=8.6, color="#555555")
