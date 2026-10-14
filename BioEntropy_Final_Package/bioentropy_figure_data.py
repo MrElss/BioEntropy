@@ -12,7 +12,7 @@ figures (Fig 02/04/05/08) the bar is normalize(group mean) while the dots are
 normalize(subject value); the 0-100 transform applies a gamma exponent and is
 therefore non-linear, so the two can differ despite sharing fitted anchors.
 Entropy is a group-level quantity and is exported without individual dots.
-Longitudinal figures 09/10 show each group's raw change from its own baseline.
+Longitudinal figures 09/10 show a shared normalized display after aligning group baselines.
 
 Also writes 图表-数据对照表.md/.csv mapping each visual element to the file and
 column holding its number, with the formula used to derive it.
@@ -426,27 +426,35 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
                 _map(exp, "图08", "每周面板上方的显著性星号", f"{s8}_annotations.csv",
                      "Significance_label / p_value", "来自 03_治疗比较.xlsx 的每周 p 值")
 
-            # ===== Figures 09 / 10 : within-group raw baseline change ====== #
+            # ===== Figures 09 / 10 : baseline-aligned normalized display ==== #
             for figure_no, metric, metric_name in (("09", bcol, short),
                                                    ("10", "Entropy", "Entropy")):
-                changes = _plots._baseline_change_table(sub, metric)
+                changes = _plots._baseline_aligned_display_table(sub, metric)
                 if not changes["Change_from_baseline"].notna().any():
                     continue
-                stem = f"Fig{figure_no}_{metric_name}_baseline_change"
+                stem = f"Fig{figure_no}_{metric_name}_baseline_aligned_normalized"
                 cols = {f"{metric_name}_raw": changes[metric]}
                 for col in ("Baseline_week", "Baseline_value", "Baseline_reference",
-                            "Change_from_baseline"):
+                            "Change_from_baseline", "Common_baseline", "Aligned_value",
+                            "Display_min", "Display_max", "Display_range_rule",
+                            "Baseline_aligned_linear_0_100", "Baseline_aligned_display_0_100_gamma3",
+                            "Baseline_display_0_100_gamma3"):
                     cols[col] = changes[col]
                 if metric == "Entropy" and "Entropy_method" in changes.columns:
                     cols["Entropy_method"] = changes["Entropy_method"]
-                _emit(exp_dir, stem, bar_frame(cols), {}, multi_week, written)
-                _map(exp, f"图{figure_no}", "折线点（相对本组基线的变化）",
-                     f"{stem}_bars.csv", "Change_from_baseline",
-                     "原始组值减去本组0W值；缺少0W时采用本组最早可用周，Baseline_reference明示；不足两周不连变化线")
+                aligned_points = _plots._baseline_aligned_points(sample_level, exp, changes, metric)
+                _emit(exp_dir, stem, bar_frame(cols), aligned_points, multi_week, written,
+                      bar_value_col="Baseline_aligned_display_0_100_gamma3")
+                _map(exp, f"图{figure_no}", "折线点（基线对齐后的归一化展示）",
+                     f"{stem}_bars.csv", "Baseline_aligned_display_0_100_gamma3",
+                     "每组减自身基线再加共同基线，按对齐后的组值统一缩放并做gamma=3变换；起点相同且非零")
+                if aligned_points:
+                    _map(exp, f"图{figure_no}", "个体散点", f"{stem}_points.csv / _prism.csv",
+                         "Value", "散点使用所属组的基线偏移和折线同一套锚点、截断与gamma；不是个体配对变化")
                 _map(exp, f"图{figure_no}", "原值和基线来源",
                      f"{stem}_bars.csv",
                      f"{metric_name}_raw / Baseline_week / Baseline_value / Baseline_reference",
-                     "使用原始尺度，未做0–100缩放、gamma或基线显著性检验；原始结果及已有组间统计不变")
+                     "保留原值、原始差值与缩放来源；展示指数不是原始值或下降百分比，不新增显著性检验")
 
         # ================= mechanism drivers ================================ #
         mech = exp_res.get("feature_mechanism", pd.DataFrame())
@@ -547,13 +555,16 @@ def _readme_text(manifest: List[Dict[str, Any]]) -> str:
     a("- **图 03/04**：只输入组Entropy（`_bars.csv`），不叠加个体ln(NMD)点。")
     a("- **图 05**：两组柱高；仅单时间点图的负担指标叠加 `*Dots_prism.csv` 中的散点。")
     a("- **图 07/08（单时间点）**：XY 图，x=`Plot_order_x`，y=`y_*`，平滑连线；散点另加。")
-    a("- **图 09/10（多时间点）**：XY 图，x=`Week`，y=`Change_from_baseline`；分别绘制各组，标明基线来源。")
+    a("- **图 09/10（多时间点）**：XY 图，x=`Week`，y=`Baseline_aligned_display_0_100_gamma3`；分别绘制各组，标明基线来源。原始差值保留在 `Change_from_baseline`。")
     a("")
-    a("## 基线变化图的解释")
+    a("## 基线对齐归一化图的解释")
     a("")
-    a("各组均有有效0W值时，图09/10的0W折线点均为0。缺少0W时，采用该组最早可用时间点，")
+    a("图09/10先对齐各组基线，再按实验的组值统一进行0–100缩放和gamma=3展示，起点相同且非零。")
+    a("仅有不升高的轨迹时，共同基线为100。没有下降的非恒定轨迹扩展下锚点；恒定范围线性值为50。")
+    a("缺少0W时采用该组最早可用时间点，")
     a("其时间和来源写入 `Baseline_week` / `Baseline_reference`，不得将该起点称作0W。")
-    a("仅有一个有效时间点的组不生成变化线。变化值是组汇总量的相减，不是同一受试者的配对变化估计；")
+    a("仅有一个有效时间点的组不连线。负担散点共享组基线偏移与折线锚点；熵不叠加个体点。")
+    a("展示值不是原始值、百分比或个体配对变化；图中0不代表原始指标为0。")
     a("这些图不额外生成置信区间或p值。原始计算结果和已有组间检验保持不变。")
     a("")
     a("## 本次导出的实验")

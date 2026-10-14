@@ -26,7 +26,7 @@ See [Methods](BioEntropy_Final_Package/METHODS.md), the
 
 ## Windows application
 
-[Download BioEntropy V1.0](https://github.com/MrElss/BioEntropy/releases/tag/v1.0.1)
+[Download BioEntropy V1.0](https://github.com/MrElss/BioEntropy/releases/tag/v1.0.2)
 for the Windows application, source archive, supplementary methods and checksums.
 
 Unpack the Windows distribution and run `BioEntropy_V1_0.exe`.
@@ -67,12 +67,19 @@ hashes, software and method identifiers, environment information and advisory QC
 Outlier flags do not trigger subject-level attenuation or exclusion. Other defined
 preprocessing and missing-data rules still apply.
 
-Longitudinal outputs include separate baseline-change figures (09 and 10) for
-disease deviation and Entropy. Each group subtracts its own value at 0W, or its
-earliest valid visit when 0W is unavailable. Baseline values therefore align at
-zero; these figures describe changes in group summaries, not paired-subject
-changes or a baseline-adjusted treatment effect. Groups with fewer than two valid
-visits have no change trajectory. Single-timepoint experiments retain group comparisons.
+Longitudinal figures 09 and 10 align each group's baseline before shared
+0–100 normalization and gamma=3 display. Each group subtracts its own baseline
+and adds the arithmetic mean of eligible group baselines. The aligned group
+estimates determine one common range. Baseline points therefore coincide at a
+nonzero display value; decreasing or unchanged trajectories start at 100.
+When there is no decrease and the range is nonconstant, the lower anchor is
+extended downward by the observed span. A constant range uses linear 50.
+Missing 0W uses the labelled earliest valid visit; at least two valid visits are
+required. Burden points share their group's offset and the curve's anchors.
+Entropy has no individual dots. Raw estimates, differences and display anchors
+remain available. This index is not a raw metric or percent change, and zero
+does not mean zero distance or entropy. It does not add paired inference or a
+baseline-adjusted treatment effect.
 
 Normalized figures use the same group-summary reference anchors for the group
 curves/bars and subject-level disease-deviation points. Clipping and the cubic
@@ -81,8 +88,8 @@ of its plotted points. Entropy is displayed at group level; log-distance subject
 points are not overlaid as individual entropy observations. Raw metrics and
 statistical results are unchanged by these display rules.
 
-The application name remains BioEntropy V1.0. Release `v1.0.1` and Windows file
-version `1.0.1.0` identify this display correction.
+The application name remains BioEntropy V1.0. Release `v1.0.2` and Windows file
+version `1.0.2.0` identify this display correction.
 
 ## Supplementary methods
 

@@ -1,50 +1,22 @@
-# BioEntropy V1.0 — display correction
+# BioEntropy V1.0 — aligned nonzero baselines
 
-The application remains **BioEntropy V1.0**. Release **v1.0.1** and Windows file
-version **1.0.1.0** identify this corrected build.
+The application remains **BioEntropy V1.0**. Release **v1.0.2** and Windows file version **1.0.2.0** identify this build. It supersedes the longitudinal display in v1.0.1.
 
 ## What changed
 
-- Longitudinal outputs now include **Figure 09: disease-deviation change** and
-  **Figure 10: Entropy change**. Each group subtracts its own 0W estimate, so the
-  baseline markers coincide at zero. If 0W is unavailable, the earliest valid
-  visit is used and recorded. Groups with fewer than two valid visits do not
-  define a change trajectory. Single-timepoint outputs remain group comparisons.
-- Individual disease-deviation points now use the same group-summary reference
-  anchors as the corresponding curves or bars. The original normalized group
-  values are preserved. Clipping and gamma=3 mean a transformed group value
-  still need not equal the mean of the transformed individual points.
-- Entropy figures show group estimates and applicable existing intervals;
-  individual log-distance dots are no longer overlaid as entropy observations.
-- Figure-data CSV files follow the actual displayed values and include the
-  baseline week, baseline value and change. Files for unplotted point layers
-  are no longer generated. New baseline-figure labels remain readable at crossings.
-- Chinese and English supplementary methods, input guidance and release metadata
-  describe the corrected display rules.
+- Main figures 09 and 10 now align each group's baseline estimate to one common, nonzero point. For trajectories that decrease after baseline, both curves start at 100 on the display index. A valid 0W estimate is preferred; otherwise the earliest valid visit is identified in the legend. Two valid visits per group are required.
+- Aligned group estimates use one shared range for each experiment and metric, are clipped to a linear 0–100 index, and then use the same gamma=3 display transform. Constant trajectories and trajectories without a decrease retain a nonzero shared start under the documented anchor rules.
+- Individual NMD, NRBS or BRI dots use their group's baseline offset and the same range, clipping and transform as the group curves. Entropy is displayed by group estimates only. Exported figure data include raw estimates, raw baseline differences, aligned estimates and display anchors; the index is neither a raw distance/entropy value nor a percentage change.
+- The Chinese and English supplementary methods and the software guidance describe the revised figures and their interpretation.
 
-## What did not change
+## Calculation and validation
 
-The NMD, covariance entropy, reference-state score, NRBS/BRI, outlier/QC,
-bootstrap and forest-module calculations are unchanged. Raw numerical tables,
-existing statistical results and original normalized group curves are preserved.
-The new baseline figures describe changes in group summaries; they do not add a
-paired-subject analysis, a new uncertainty interval or a baseline-adjusted
-treatment-effect estimate. The original absolute-value plots remain available.
+Scientific calculations, existing group estimates, intervals, comparisons, effect sizes and original figures 01–08 are unchanged. The new figures are descriptive summaries and do not imply paired-subject inference or baseline-adjusted ANCOVA.
 
-## Validation
-
-- **155 tests passed; 7 optional external-data tests skipped.** Static checks passed.
-  Two existing Matplotlib layout warnings occurred in unrelated figure-export tests.
-- Numerical fixtures are unchanged, and the public regression suite checks the
-  full result tables against those fixtures. Computational modules were also
-  compared with the preceding release.
-- Source and Windows executable end-to-end self-tests passed: 32 synthetic
-  sample records, 4 group/visit summaries, 10 figures and 21 figure-data files.
-  Raw distance and entropy summaries agree between source and executable.
-- Existing longitudinal study tables were checked locally: baseline changes
-  begin at zero, normalized points use the group-curve anchors, original group
-  values match and the study files remain untouched. Those data are not distributed.
-- Bilingual Word documents were checked for method consistency and page layout.
+- **162 tests passed; 7 optional external-data tests skipped.** Two existing Matplotlib layout warnings remain in unrelated figure-export tests.
+- Source and Windows executable self-tests passed using 32 synthetic sample records, 4 group/visit summaries, 10 figures and 23 figure-data files. Raw distance and entropy summaries agree exactly.
+- Experiment 105 was rerun locally with the new source. All 10 result workbooks match the preceding run at every one of 100,693 numerical cells; maximum absolute difference is zero. Its new curves also match the accepted display preview. Private study inputs and outputs are not included in the download.
+- Both supplementary Word documents contain 8 pages and 13 editable equations; the 12 original scientific equations are unchanged.
 
 ## Downloads
 
@@ -53,5 +25,4 @@ treatment-effect estimate. The original absolute-value plots remain available.
 - **BioEntropy_V1.0_SI_CN.docx / BioEntropy_V1.0_SI_EN.docx** — editable supplementary methods.
 - **BioEntropy_V1.0_SHA256.txt** — checksums for the downloads and executable.
 
-For overlapping 0W starting points, open **main figure 09 or 10**. The original
-absolute-value and normalized figures retain observed baseline differences.
+For coincident nonzero baseline points, open main figure **09** or **10**. Figures 01–08 retain their original definitions.

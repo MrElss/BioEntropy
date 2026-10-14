@@ -70,6 +70,8 @@ __all__ = [
     "plot_entropy_baseline_aligned",
     "plot_burden_baseline_aligned",
     "_baseline_change_table",
+    "_baseline_aligned_display_table",
+    "_baseline_aligned_points",
     "plot_true_normal_nmd_trajectory",
     "plot_true_normal_nmd_baseline_aligned",
     "plot_true_normal_nmd_entropy_3d",
@@ -948,7 +950,7 @@ def _plot_metric_baseline_change(
         sub = sub.loc[sub["Experiment"].astype(str) == str(experiment)].copy()
     if metric_col not in sub.columns or _is_single_timepoint(sub):
         return
-    aligned = _baseline_change_table(sub, metric_col)
+    aligned = _baseline_aligned_display_table(sub, metric_col)
     aligned = aligned.loc[np.isfinite(aligned["Change_from_baseline"])].copy()
     if aligned.empty:
         return
@@ -962,43 +964,51 @@ def _plot_metric_baseline_change(
     for week, week_rows in aligned.groupby("Week", sort=False):
         ordered = sorted(
             week_rows.to_dict("records"),
-            key=lambda row: (-float(row["Change_from_baseline"]), group_rank.get(str(row["Group"]), len(groups))),
+            key=lambda row: (-float(row["Baseline_aligned_display_0_100_gamma3"]), group_rank.get(str(row["Group"]), len(groups))),
         )
         upper_count = (len(ordered) + 1) // 2
         for rank, row in enumerate(ordered):
             offset = (8 + 10 * (upper_count - rank - 1)) if rank < upper_count else (-8 - 10 * (rank - upper_count))
             label_offsets[(str(row["Group"]), float(week))] = offset
     fig, ax = plt.subplots(figsize=(10.2, 6.4))
+    points = _baseline_aligned_points(_dstate.CURRENT_SAMPLE_LEVEL, experiment, aligned, metric_col)
+    jitter = np.random.default_rng(42)
+    for (group, week), values in points.items():
+        ax.scatter(week + jitter.uniform(-0.55, 0.55, len(values)), values,
+                   s=12, alpha=0.14, color=cmap.get(group), edgecolors="none", zorder=1)
     handles, labels = [], []
     for idx, group in enumerate(groups):
         g = aligned.loc[aligned["Group"].astype(str) == str(group)].sort_values("Week")
         if g.empty:
             continue
         color = cmap.get(group, _FALLBACK_COLORS[idx % len(_FALLBACK_COLORS)])
-        ax.plot(g["Week"], g["Change_from_baseline"], marker="o", linewidth=2,
+        ax.plot(g["Week"], g["Baseline_aligned_display_0_100_gamma3"], marker="o", linewidth=2,
                 color=color, markeredgecolor="white", zorder=4)
         baseline_week = float(g["Baseline_week"].iloc[0])
         handles.append(_legacy._Line2D([0], [0], color=color, marker="o", linewidth=2))
         labels.append(f"{display_group_name(group, idx)} (baseline {baseline_week:g}W)")
         for _, row in g.iterrows():
             offset = label_offsets[(str(group), float(row["Week"]))]
-            ax.annotate(f"{row['Change_from_baseline']:+.3g}",
-                        (float(row["Week"]), float(row["Change_from_baseline"])),
+            value = float(row["Baseline_aligned_display_0_100_gamma3"])
+            ax.annotate(f"{value:.3g}",
+                        (float(row["Week"]), value),
                         xytext=(0, offset), textcoords="offset points",
                         ha="center", va="bottom" if offset > 0 else "top",
                         fontsize=8, color=color, zorder=6)
-    ax.axhline(0, color="#666666", linestyle="--", linewidth=1)
     ax.set_xticks(weeks)
     ax.set_xticklabels([f"{w:g}W" for w in weeks])
     ax.set_xlabel("Week")
-    ax.set_ylabel(f"Change in {metric_label} from own baseline (original units)")
-    ax.margins(y=0.16)
+    ax.set_ylabel(f"Baseline-aligned {metric_label} display index (0–100)")
+    ax.set_ylim(-7, 112)
     _legacy._format_axis(ax)
+    point_note = "Points share the group offset and scaling. " if points else "Entropy is shown by group estimates only. "
     _legacy._add_top_title_and_note(
-        fig, title=f"Experiment {experiment}: {metric_label} change from own baseline",
-        note=("Each group estimate minus its own 0W estimate; if 0W is unavailable, the earliest valid week is used and shown in the legend. "
-              "Negative values indicate a decrease. Original units; no gamma or percentage scaling. "
-              "Descriptive group changes only; no paired-subject inference or change-score confidence interval is implied."),
+        fig, title=f"Experiment {experiment}: baseline-aligned normalized {metric_label}",
+        note=(("Groups share a nonzero baseline point after alignment and shared 0–100 scaling; gamma=3. "
+               "For decreasing trajectories the shared baseline is 100. Missing 0W uses the labelled earliest valid visit. ")
+              + point_note
+              + ("Display values are not raw values or percent change; "
+                 "zero does not mean zero raw distance or entropy. No paired-subject inference is implied.")),
         legend_handles=handles, legend_labels=labels, legend_ncol=min(len(labels), 3),
         legend_y=0.865, title_y=0.985, note_y=0.948, note_width=122, note_fontsize=8.6,
     )
@@ -3568,6 +3578,86 @@ def _baseline_change_table(summary_df: pd.DataFrame, metric_col: str) -> pd.Data
             "0W" if baseline_week == 0 else "earliest_available_week"
         )
     return out
+
+
+def _baseline_aligned_display_table(summary_df: pd.DataFrame, metric_col: str) -> pd.DataFrame:
+    """Align group baselines, then fit one display range per experiment.
+
+    The common offset is the unweighted mean of the eligible group baselines.
+    It cancels in the shared min-max transformation. A lower display anchor is
+    extended by the observed span when every change is nonnegative, ensuring
+    that the shared baseline remains nonzero. A constant range uses linear 50.
+    Original values and differences remain in the returned copy.
+    """
+    out = _baseline_change_table(summary_df, metric_col)
+    columns = ["Common_baseline", "Aligned_value", "Display_min", "Display_max",
+               "Baseline_aligned_linear_0_100", "Baseline_aligned_display_0_100_gamma3",
+               "Baseline_display_0_100_gamma3"]
+    for name in columns:
+        out[name] = np.nan
+    out["Display_range_rule"] = "unavailable"
+    keys = ["Experiment"] if "Experiment" in out.columns else None
+    sets = out.groupby(keys, sort=False, dropna=False).indices.values() if keys else [np.arange(len(out))]
+    for positions in sets:
+        valid = positions[np.isfinite(out["Change_from_baseline"].iloc[positions])]
+        if not len(valid):
+            continue
+        subset = out.iloc[valid]
+        common = float(subset.drop_duplicates("Group")["Baseline_value"].mean())
+        values = subset["Change_from_baseline"].to_numpy(dtype=float) + common
+        lo, hi = float(values.min()), float(values.max())
+        rule = "observed_minmax"
+        if math.isclose(lo, hi):
+            linear = np.full(len(valid), 50.0)
+            baseline_linear = 50.0
+            rule = "constant_range"
+        else:
+            if math.isclose(lo, common):
+                lo = common - (hi - common)
+                rule = "padded_lower_anchor"
+            linear = np.clip((values - lo) / (hi - lo), 0.0, 1.0) * 100.0
+            baseline_linear = float(np.clip((common - lo) / (hi - lo), 0.0, 1.0) * 100.0)
+        assignments = {"Common_baseline": common, "Aligned_value": values,
+                       "Display_min": lo, "Display_max": hi,
+                       "Baseline_aligned_linear_0_100": linear,
+                       "Baseline_aligned_display_0_100_gamma3": 100.0 * (linear / 100.0) ** DISPLAY_CONTRAST_GAMMA,
+                       "Baseline_display_0_100_gamma3": 100.0 * (baseline_linear / 100.0) ** DISPLAY_CONTRAST_GAMMA,
+                       "Display_range_rule": rule}
+        for name, value in assignments.items():
+            out.iloc[valid, out.columns.get_loc(name)] = value
+    return out
+
+
+def _baseline_aligned_points(sample_level: pd.DataFrame, experiment: str,
+                             aligned: pd.DataFrame, metric_col: str) -> Dict[tuple, np.ndarray]:
+    """Subject display points using the exact group offset and display anchors."""
+    if metric_col == "Entropy" or not isinstance(sample_level, pd.DataFrame) or sample_level.empty:
+        return {}
+    base = metric_col[:-5] if metric_col.endswith("_mean") else metric_col
+    if not {base, "Group", "Week"}.issubset(sample_level.columns):
+        return {}
+    samples = sample_level
+    if "Experiment" in samples.columns:
+        samples = samples[samples["Experiment"].astype(str) == str(experiment)]
+    cells = {}
+    for _, row in aligned.iterrows():
+        if not np.isfinite(row.get("Aligned_value", np.nan)):
+            continue
+        group, week = str(row["Group"]), int(row["Week"])
+        selected = samples[(samples["Group"].astype(str) == group) &
+                           (pd.to_numeric(samples["Week"], errors="coerce") == week)]
+        raw = pd.to_numeric(selected[base], errors="coerce").to_numpy(dtype=float)
+        raw = raw[np.isfinite(raw)]
+        if not len(raw):
+            continue
+        if row["Display_range_rule"] == "constant_range":
+            linear = np.full(len(raw), 50.0)
+        else:
+            values = raw - float(row["Baseline_value"]) + float(row["Common_baseline"])
+            linear = np.clip((values - float(row["Display_min"])) /
+                             (float(row["Display_max"]) - float(row["Display_min"])), 0, 1) * 100.0
+        cells[(group, week)] = 100.0 * (linear / 100.0) ** DISPLAY_CONTRAST_GAMMA
+    return cells
 
 
 def build_display_normalized_metric_table(results: Dict[str, Any]) -> pd.DataFrame:

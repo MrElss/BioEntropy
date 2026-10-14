@@ -224,15 +224,21 @@ and input hashes, and available environment information.
 
 ### Display and baseline changes
 
-Longitudinal figures 09 and 10 show each group's metric minus that group's
-0W value. When 0W is missing, the earliest valid visit is recorded and used.
-Groups with fewer than two valid visits do not have a change trajectory;
-single-timepoint experiments are not baseline-aligned. These are differences
-between group summaries, without a paired-subject restriction, a new uncertainty
-interval, or an additional treatment-effect test. Raw metrics and existing
-statistical outputs remain unchanged.
+Longitudinal figures 09/10 align group baselines: A(g,t)=X(g,t)−X(g,b)+B,
+where B is the arithmetic mean of eligible group baselines. Prefer a finite 0W
+estimate; otherwise label the earliest valid visit. Groups require two valid
+visits. Aligned group values fit common min/max anchors within each experiment
+and metric. Clip the linear 0–100 index L and display 100*(L/100)^3.
+If no change is negative and the range is nonconstant, extend the lower anchor
+downward by the observed span so the baseline stays nonzero. A constant range
+uses L=50. With decreasing or unchanged trajectories, the shared baseline is 100.
+Burden dots share their group's offset and the curve's anchors; Entropy has no
+individual dots. Raw estimates, differences and anchors are exported. This is
+not a raw metric or percent change; zero does not mean zero distance or entropy.
+No paired inference, new intervals or baseline-adjusted treatment effects are added.
+Raw metrics and existing statistical outputs remain unchanged.
 
-For normalized figures, the group curves/bars and disease-deviation subject
+For normalized level figures, the group curves/bars and disease-deviation subject
 points use the same anchors fitted to that figure's valid group summaries within
 the experiment: distinct Normal/model means when available, otherwise their
 minimum/maximum. Joint views can first require both metrics to be present and
@@ -244,7 +250,7 @@ Thus a transformed group mean is not generally the mean of the
 transformed points; endpoint values may reflect clipping rather than observed
 normality. Entropy remains a group-level estimate and is displayed without
 individual log-distance points. The normalized group curves retain their prior
-values; the additional baseline-change figures have no gamma transform.
+values; the baseline-aligned normalized figures also use gamma=3.
 
 ### Scientific interpretation
 

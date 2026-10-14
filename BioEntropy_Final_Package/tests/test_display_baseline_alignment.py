@@ -78,7 +78,7 @@ def test_no_change_figure_data_when_groups_have_disjoint_single_timepoints(tmp_p
     results = {"experiments": {"Clinical": {"summary": summary, "sample_level": samples,
                                               "true_normal_available": True}}}
     paths = figure_data.export_figure_data_tables(results, tmp_path)
-    assert not any("baseline_change" in p.name for p in paths)
+    assert not any("baseline_aligned_normalized" in p.name for p in paths)
 
 
 @pytest.mark.parametrize("mode", ["linear", "display"])
@@ -171,18 +171,19 @@ def test_longitudinal_delta_exports_and_single_timepoint_omission(tmp_path, metr
     paths = figure_data.export_figure_data_tables(results, tmp_path / "clinical")
     names = {p.name for p in paths}
     for fig, name in (("09", metric), ("10", "Entropy")):
-        filename = f"Fig{fig}_{name}_baseline_change_bars.csv"
+        filename = f"Fig{fig}_{name}_baseline_aligned_normalized_bars.csv"
         assert filename in names
         table = pd.read_csv(tmp_path / "clinical" / figure_data.FIGURE_DATA_DIRNAME /
                             "Clinical" / filename)
         assert table.loc[table["Week"] == 0, "Change_from_baseline"].eq(0).all()
+        assert table.loc[table["Week"] == 0, "Baseline_aligned_display_0_100_gamma3"].eq(100).all()
         assert {f"{name}_raw", "Baseline_week", "Baseline_value", "Baseline_reference"}.issubset(table.columns)
     assert_frame_equal(summary, before_summary)
     assert_frame_equal(samples, before_samples)
     results["experiments"]["Clinical"]["summary"] = summary[summary["Week"] == 0]
     results["experiments"]["Clinical"]["sample_level"] = samples[samples["Week"] == 0]
     paths = figure_data.export_figure_data_tables(results, tmp_path / "animal")
-    assert not any("baseline_change" in p.name for p in paths)
+    assert not any("baseline_aligned_normalized" in p.name for p in paths)
 
 
 def test_joint_charts_share_anchors_from_only_valid_joint_rows(tmp_path):
@@ -202,3 +203,57 @@ def test_joint_charts_share_anchors_from_only_valid_joint_rows(tmp_path):
     assert set(grouped_bars["Group"]) == {"Model", "Treatment"}
     assert sorted(grouped["Value"].tolist()) == [0.0, 12.5, 12.5, 100.0]
     assert sorted(state["Value"].tolist()) == [0.0, 50.0, 50.0, 100.0]
+
+
+@pytest.mark.parametrize("metric", ["NMD_mean", "Entropy"])
+def test_normalized_baselines_overlap_at_100_without_changing_raw_results(metric):
+    summary, _ = _longitudinal_case()
+    original = summary.copy(deep=True)
+    displayed = plots._baseline_aligned_display_table(summary, metric)
+    assert displayed.loc[displayed.Week == 0, "Baseline_aligned_display_0_100_gamma3"].eq(100).all()
+    assert displayed.loc[displayed.Week == 0, "Baseline_value"].nunique() == 2
+    assert_frame_equal(summary, original)
+    assert displayed[metric].equals(summary[metric])
+
+
+@pytest.mark.parametrize("later,expected_rule", [(13.0, "padded_lower_anchor"),
+                                                  (12.0, "constant_range")])
+def test_nonzero_baseline_for_rising_and_constant_trajectories(later, expected_rule):
+    summary, _ = _longitudinal_case()
+    summary["NMD_mean"] = [12.0, later, 12.0, later]
+    displayed = plots._baseline_aligned_display_table(summary, "NMD_mean")
+    assert displayed.loc[displayed.Week == 0, "Baseline_aligned_display_0_100_gamma3"].eq(12.5).all()
+    assert displayed.Display_range_rule.eq(expected_rule).all()
+
+
+def test_normalized_baselines_use_experiment_specific_anchors_and_label_missing_zero():
+    summary, _ = _longitudinal_case()
+    summary.loc[summary.Group == "Placebo", "Week"] = [6, 12]
+    other = summary.assign(Experiment="Other", NMD_mean=[8.0, 12.0, 8.0, 12.0])
+    displayed = plots._baseline_aligned_display_table(pd.concat([summary, other], ignore_index=True), "NMD_mean")
+    first = displayed[displayed.Experiment == "Clinical"]
+    assert first.Baseline_display_0_100_gamma3.eq(100).all()
+    assert first.loc[first.Group == "Placebo", "Baseline_week"].eq(6).all()
+    assert displayed.loc[displayed.Experiment == "Other", "Baseline_display_0_100_gamma3"].eq(12.5).all()
+
+
+def test_aligned_point_exports_share_curve_anchors(tmp_path):
+    summary, samples = _longitudinal_case()
+    results = {"experiments": {"Clinical": {"summary": summary, "sample_level": samples,
+                                              "true_normal_available": True}}}
+    paths = figure_data.export_figure_data_tables(results, tmp_path)
+    folder = tmp_path / figure_data.FIGURE_DATA_DIRNAME / "Clinical"
+    bars = pd.read_csv(folder / "Fig09_NMD_baseline_aligned_normalized_bars.csv")
+    points = pd.read_csv(folder / "Fig09_NMD_baseline_aligned_normalized_points.csv")
+    # Shared change range is [-6,0]. Treatment raw baselines are 12 and Placebo 10.
+    baseline = {"Treatment": 12.0, "Placebo": 10.0}
+    for (group, week), values in points.groupby(["Group", "Week"], sort=False):
+        raw = samples.loc[(samples.Group == group) & (samples.Week == week), "NMD"].to_numpy()
+        expected = 100 * np.clip((raw - baseline[group] + 6) / 6, 0, 1) ** 3
+        np.testing.assert_allclose(values.Value, expected)
+    assert bars.loc[bars.Week == 0, "Baseline_aligned_display_0_100_gamma3"].eq(100).all()
+    assert not any("Fig10" in p.name and "points" in p.name for p in paths)
+    plotted = plots._baseline_aligned_points(samples, "Clinical",
+        plots._baseline_aligned_display_table(summary, "NMD_mean"), "NMD_mean")
+    for key, values in plotted.items():
+        np.testing.assert_allclose(points.loc[(points.Group == key[0]) & (points.Week == key[1]), "Value"], values)
