@@ -224,7 +224,7 @@ and input hashes, and available environment information.
 
 ### Display and baseline changes
 
-Longitudinal figures 09/10 align group baselines: A(g,t)=X(g,t)−X(g,b)+B,
+Longitudinal figures 02/04 align group baselines: A(g,t)=X(g,t)−X(g,b)+B,
 where B is the arithmetic mean of eligible group baselines. Prefer a finite 0W
 estimate; otherwise label the earliest valid visit. Groups require two valid
 visits. Aligned group values fit common min/max anchors within each experiment
@@ -262,3 +262,5 @@ With few models, report the model-specific estimates and modified Hartung-Knapp
 intervals and treat composite pooled results as exploratory. The standalone forest
 module uses its own preprocessing and must be described separately from the main
 analysis. See the bilingual supplementary methods in `docs/` at the repository root.
+
+Multi-visit experiments export eight main artifacts; baseline-aligned figures 02/04 replace the former duplicate 09/10 outputs. Single-visit experiments retain nine main artifacts and original normalized level figures 02/04. Raw estimates remain in figures 01/03 and result workbooks.

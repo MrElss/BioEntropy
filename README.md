@@ -26,7 +26,7 @@ See [Methods](BioEntropy_Final_Package/METHODS.md), the
 
 ## Windows application
 
-[Download BioEntropy V1.0](https://github.com/MrElss/BioEntropy/releases/tag/v1.0.2)
+[Download BioEntropy V1.0](https://github.com/MrElss/BioEntropy/releases/tag/v1.0.3)
 for the Windows application, source archive, supplementary methods and checksums.
 
 Unpack the Windows distribution and run `BioEntropy_V1_0.exe`.
@@ -67,7 +67,11 @@ hashes, software and method identifiers, environment information and advisory QC
 Outlier flags do not trigger subject-level attenuation or exclusion. Other defined
 preprocessing and missing-data rules still apply.
 
-Longitudinal figures 09 and 10 align each group's baseline before shared
+Multi-visit experiments output eight main artifacts, with no duplicate figures 09/10.
+Single-visit experiments retain their nine artifacts and original normalized
+figures 02/04. Raw estimates remain in figures 01/03 and result workbooks.
+
+Longitudinal figures 02 and 04 align each group's baseline before shared
 0–100 normalization and gamma=3 display. Each group subtracts its own baseline
 and adds the arithmetic mean of eligible group baselines. The aligned group
 estimates determine one common range. Baseline points therefore coincide at a
@@ -88,8 +92,8 @@ of its plotted points. Entropy is displayed at group level; log-distance subject
 points are not overlaid as individual entropy observations. Raw metrics and
 statistical results are unchanged by these display rules.
 
-The application name remains BioEntropy V1.0. Release `v1.0.2` and Windows file
-version `1.0.2.0` identify this display correction.
+The application name remains BioEntropy V1.0. Release `v1.0.3` and Windows file
+version `1.0.3.0` identify this display correction.
 
 ## Supplementary methods
 

@@ -5,8 +5,10 @@ group roles and Normal-reference source. Keep a copy of the input workbooks and
 record the selected parameters. The main workflow and the separate forest module
 have different preprocessing and outcome definitions.
 
-For overlapping nonzero starting points, use main figures 09 and 10. Groups
-subtract their own baseline and add the mean of eligible group baselines, then
+Multi-visit experiments output eight main artifacts. Figures 02 and 04
+show overlapping nonzero starting points; duplicate figures 09/10 are omitted.
+Single-visit experiments retain their nine artifacts and original figures 02/04.
+For multi-visit displays, groups subtract their own baseline and add the mean of eligible group baselines, then
 share a min/max 0–100 mapping and gamma=3 display. Decreasing or unchanged
 trajectories start at 100. With a nonconstant range and no decrease, the lower
 anchor is extended downward by the observed span; a constant range uses linear
@@ -14,7 +16,7 @@ anchor is extended downward by the observed span; a constant range uses linear
 visits do not define a trajectory. Burden dots share group offsets and anchors;
 Entropy has no dots. The index is not a raw value or percentage, and zero does
 not mean zero distance or entropy. It does not add paired or baseline-adjusted
-inference. Original plots and raw results remain available.
+inference. Raw figures 01/03 and result workbooks retain original estimates.
 
 Normalized subject points use the same group-summary anchors as the corresponding
 curves or bars. Clipping and gamma=3 are display operations, and the transformed

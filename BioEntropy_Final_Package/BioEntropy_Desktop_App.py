@@ -378,7 +378,7 @@ class BioEntropyDesktopApp:
                 "使用 Ledoit–Wolf 全协方差马氏距离作为主 NMD，另存对角封顶距离用于敏感性比较。"
                 "取消强异常个体的额外 0.5 收缩，异常检测仅用于 QC；已有截尾预处理保留。\n\n"
                 "如果没有真实 Normal 样本但有外部正常区间，可上传“实验号-NormalRange.xlsx”，软件会额外输出 NRBS / NRPS。"
-                "结果包括 Excel 工作簿和主图：多时间点通常为 10 个，单时间点通常为 9 个。多时间点主图09/10展示基线对齐后的归一化指数，起点相同且非零；下降或不变轨迹从100开始。",
+                "结果包括 Excel 工作簿和主图：多时间点通常为 8 个，单时间点通常为 9 个。多时间点主图02/04展示基线对齐后的归一化指数，起点相同且非零；下降或不变轨迹从100开始。",
                 "BioEntropy analyses disease deviation and system entropy across multi-group, "
                 "multi-timepoint biomarker data. It batch-reads standardised Excel files and "
                 "performs common-feature detection, robust preprocessing, entropy estimation, "

@@ -12,7 +12,7 @@ figures (Fig 02/04/05/08) the bar is normalize(group mean) while the dots are
 normalize(subject value); the 0-100 transform applies a gamma exponent and is
 therefore non-linear, so the two can differ despite sharing fitted anchors.
 Entropy is a group-level quantity and is exported without individual dots.
-Longitudinal figures 09/10 show a shared normalized display after aligning group baselines.
+Longitudinal figures 02/04 show a shared normalized display after aligning group baselines.
 
 Also writes 图表-数据对照表.md/.csv mapping each visual element to the file and
 column holding its number, with the formula used to derive it.
@@ -292,22 +292,23 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
                  "Significance_label / Delta_treatment_minus_comparator / p_value",
                  "来自 03_治疗比较.xlsx：Δ=治疗组−对照组均值差；p 为 Mann–Whitney U 检验")
 
-        # ================= Figure 02 : normalized deviation ================= #
-        burden_pts_disp = _collect_points(sample_level, exp, base, groups, weeks,
-                                          multi_week, normalize="display",
-                                          reference_summary=sub)
-        s2 = f"Fig02_{short}_normalized"
-        _emit(exp_dir, s2,
-              bar_frame({f"{short}_raw": sub[bcol],
-                          "Linear_anchored_0_100": disp_b_lin,
-                          "Display_plotted_0_100_gamma3": disp_b_gamma}),
-              burden_pts_disp, multi_week, written,
-              bar_value_col="Display_plotted_0_100_gamma3")
-        _map(exp, "图02", "柱高/折线点（归一化显示值）", f"{s2}_bars.csv",
-             "Display_plotted_0_100_gamma3",
-             "以本实验全部组汇总值拟合 Normal/model 锚点；不可用时用组汇总值范围；截断至0–100后施加 gamma=3")
-        _map(exp, "图02", "散点", f"{s2}_points.csv / _prism.csv", "Value",
-             "使用与组折线/柱相同的锚点、截断及gamma变换；不再按个体范围重新缩放。非线性时散点均值可不同于柱高")
+        if not multi_week:
+            # ================= Figure 02 : normalized deviation ================= #
+            burden_pts_disp = _collect_points(sample_level, exp, base, groups, weeks,
+                                              multi_week, normalize="display",
+                                              reference_summary=sub)
+            s2 = f"Fig02_{short}_normalized"
+            _emit(exp_dir, s2,
+                  bar_frame({f"{short}_raw": sub[bcol],
+                              "Linear_anchored_0_100": disp_b_lin,
+                              "Display_plotted_0_100_gamma3": disp_b_gamma}),
+                  burden_pts_disp, multi_week, written,
+                  bar_value_col="Display_plotted_0_100_gamma3")
+            _map(exp, "图02", "柱高/折线点（归一化显示值）", f"{s2}_bars.csv",
+                 "Display_plotted_0_100_gamma3",
+                 "以本实验全部组汇总值拟合 Normal/model 锚点；不可用时用组汇总值范围；截断至0–100后施加 gamma=3")
+            _map(exp, "图02", "散点", f"{s2}_points.csv / _prism.csv", "Value",
+                 "使用与组折线/柱相同的锚点、截断及gamma变换；不再按个体范围重新缩放。非线性时散点均值可不同于柱高")
 
         # ================= Figure 03 : raw entropy ========================== #
         ent_pts = _collect_points(sample_level, exp, base, groups, weeks, multi_week,
@@ -335,19 +336,20 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
                  "Significance_label / Delta_treatment_minus_comparator / p_value",
                  "来自 03_治疗比较.xlsx：Δ=治疗组−对照组熵差；p 为自助法/Mann–Whitney")
 
-        # ================= Figure 04 : normalized entropy =================== #
-        ent_pts_disp = _collect_points(sample_level, exp, base, groups, weeks,
-                                       multi_week, entropy_contribution=True,
-                                       normalize="display")
-        s4 = "Fig04_Entropy_normalized"
-        _emit(exp_dir, s4,
-              bar_frame({"Entropy_raw": sub["Entropy"],
-                          "Linear_anchored_0_100": disp_e_lin,
-                          "Display_plotted_0_100_gamma3": disp_e_gamma}),
-              ent_pts_disp, multi_week, written,
-              bar_value_col="Display_plotted_0_100_gamma3")
-        _map(exp, "图04", "柱高/折线点（熵归一化显示值）", f"{s4}_bars.csv",
-             "Display_plotted_0_100_gamma3", "同图02，对熵做线性锚定 + gamma=3")
+        if not multi_week:
+            # ================= Figure 04 : normalized entropy =================== #
+            ent_pts_disp = _collect_points(sample_level, exp, base, groups, weeks,
+                                           multi_week, entropy_contribution=True,
+                                           normalize="display")
+            s4 = "Fig04_Entropy_normalized"
+            _emit(exp_dir, s4,
+                  bar_frame({"Entropy_raw": sub["Entropy"],
+                              "Linear_anchored_0_100": disp_e_lin,
+                              "Display_plotted_0_100_gamma3": disp_e_gamma}),
+                  ent_pts_disp, multi_week, written,
+                  bar_value_col="Display_plotted_0_100_gamma3")
+            _map(exp, "图04", "柱高/折线点（熵归一化显示值）", f"{s4}_bars.csv",
+                 "Display_plotted_0_100_gamma3", "同图02，对熵做线性锚定 + gamma=3")
 
         # ================= Figure 05 : grouped bar ========================== #
         joint_sub = sub.dropna(subset=[bcol, "Entropy"])
@@ -426,9 +428,9 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
                 _map(exp, "图08", "每周面板上方的显著性星号", f"{s8}_annotations.csv",
                      "Significance_label / p_value", "来自 03_治疗比较.xlsx 的每周 p 值")
 
-            # ===== Figures 09 / 10 : baseline-aligned normalized display ==== #
-            for figure_no, metric, metric_name in (("09", bcol, short),
-                                                   ("10", "Entropy", "Entropy")):
+            # ===== Figures 02 / 04 : baseline-aligned normalized display ==== #
+            for figure_no, metric, metric_name in (("02", bcol, short),
+                                                   ("04", "Entropy", "Entropy")):
                 changes = _plots._baseline_aligned_display_table(sub, metric)
                 if not changes["Change_from_baseline"].notna().any():
                     continue
@@ -533,7 +535,7 @@ def _readme_text(manifest: List[Dict[str, Any]]) -> str:
     a("| 图 02 / 05（负担） | 不一定 | 组值和散点共享组汇总值确定的锚点，但截断和gamma=3会使均值关系改变 |")
     a("| 图 03 / 04 / 05（熵） | 不适用 | 仅显示组Entropy；不把个体ln(NMD)贡献作为同一熵指标的散点 |")
     a("| 图 08（单时间点状态图） | 不一定 | 组值和散点使用相同线性锚点，但0–100截断可能改变均值关系 |")
-    a("| 图 09 / 10（多时间点基线变化） | 不适用 | 原始组值减本组基线；不输出个体配对变化散点 |")
+    a("| 图 02（多时间点基线对齐） | 不一定 | 散点与组值共享组基线偏移、锚点及gamma；不是个体配对变化 |")
     a("")
     a("**把归一化散点粘进 Prism 后，不要让 Prism 自动算均值当柱高**；")
     a("请把 `*_bars.csv` 中的柱高作为**独立的一组数据**输入。")
@@ -555,11 +557,11 @@ def _readme_text(manifest: List[Dict[str, Any]]) -> str:
     a("- **图 03/04**：只输入组Entropy（`_bars.csv`），不叠加个体ln(NMD)点。")
     a("- **图 05**：两组柱高；仅单时间点图的负担指标叠加 `*Dots_prism.csv` 中的散点。")
     a("- **图 07/08（单时间点）**：XY 图，x=`Plot_order_x`，y=`y_*`，平滑连线；散点另加。")
-    a("- **图 09/10（多时间点）**：XY 图，x=`Week`，y=`Baseline_aligned_display_0_100_gamma3`；分别绘制各组，标明基线来源。原始差值保留在 `Change_from_baseline`。")
+    a("- **图 02/04（多时间点）**：XY 图，x=`Week`，y=`Baseline_aligned_display_0_100_gamma3`；分别绘制各组，标明基线来源。原始差值保留在 `Change_from_baseline`。")
     a("")
     a("## 基线对齐归一化图的解释")
     a("")
-    a("图09/10先对齐各组基线，再按实验的组值统一进行0–100缩放和gamma=3展示，起点相同且非零。")
+    a("多时间点图02/04先对齐各组基线，再按实验的组值统一进行0–100缩放和gamma=3展示，起点相同且非零。")
     a("仅有不升高的轨迹时，共同基线为100。没有下降的非恒定轨迹扩展下锚点；恒定范围线性值为50。")
     a("缺少0W时采用该组最早可用时间点，")
     a("其时间和来源写入 `Baseline_week` / `Baseline_reference`，不得将该起点称作0W。")

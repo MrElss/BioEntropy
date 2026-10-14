@@ -1,9 +1,9 @@
 {
   "software_name": "BioEntropy",
   "calculation_version": "V1.0",
-  "release_date": "2026-10-13",
-  "release_tag": "v1.0.2",
-  "display_revision": "baseline-aligned-nonzero-shared-anchors-2",
+  "release_date": "2026-10-14",
+  "release_tag": "v1.0.3",
+  "display_revision": "baseline-aligned-main-02-04-single-visit-preserved-3",
   "method_revision": "full-covariance-primary-no-subject-attenuation-1",
   "primary_nmd": "ledoitwolf_full_covariance",
   "subject_attenuation": false

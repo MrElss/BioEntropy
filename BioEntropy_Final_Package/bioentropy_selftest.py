@@ -59,12 +59,14 @@ def run_self_test(report_path: str) -> int:
                                'normal_reference_experiments': list(normals)})
             assert not bundle.get('audit_error')
             assert len(bundle['figure_paths']) > 0 and len(bundle['figure_data_files']) > 0
+            assert len(bundle['figure_paths']) == 8
+            assert not any('_main_09_' in p or '_main_10_' in p for p in bundle['figure_paths'])
             assert all(Path(p).is_file() for p in bundle['figure_paths'].values())
             pd.testing.assert_frame_equal(summary, original_summary, check_exact=True)
             change_files = [
                 Path(bundle['output_dir']) / '图形数据_GraphPad' / 'SMOKE' / name
-                for name in ['Fig09_NMD_baseline_aligned_normalized_bars.csv',
-                             'Fig10_Entropy_baseline_aligned_normalized_bars.csv']
+                for name in ['Fig02_NMD_baseline_aligned_normalized_bars.csv',
+                             'Fig04_Entropy_baseline_aligned_normalized_bars.csv']
             ]
             for change_file in change_files:
                 changes = pd.read_csv(change_file)

@@ -121,10 +121,10 @@ def test_nonlinearity_does_not_force_mean_of_scatter_to_equal_group_marker(tmp_p
                                              "true_normal_available": True}}}
     figure_data.export_figure_data_tables(result, tmp_path)
     bars = pd.read_csv(tmp_path / figure_data.FIGURE_DATA_DIRNAME / "Clinical" /
-                       "Fig02_NMD_normalized_bars.csv")
+                       "Fig02_NMD_baseline_aligned_normalized_bars.csv")
     row = bars[(bars["Group"] == "Placebo") & (bars["Week"] == 0)].iloc[0]
-    assert row["Display_plotted_0_100_gamma3"] == pytest.approx(100 * (4 / 6) ** 3)
-    assert row["Mean_of_plotted_points"] == pytest.approx(50 * ((2 / 6) ** 3 + 1))
+    assert row["Baseline_aligned_display_0_100_gamma3"] == pytest.approx(100)
+    assert row["Mean_of_plotted_points"] == pytest.approx(50 * ((4 / 6) ** 3 + 1))
     assert row["Bar_equals_mean_of_points"] == "NO"
 
 
@@ -155,7 +155,7 @@ def test_entropy_export_has_no_incompatible_individual_dots(tmp_path, method):
     names = {p.name for p in paths}
     assert not any("Fig05" in name and "Dots" in name for name in names)
     assert "Fig03_Entropy_raw_bars.csv" in names
-    assert "Fig04_Entropy_normalized_bars.csv" in names
+    assert "Fig04_Entropy_baseline_aligned_normalized_bars.csv" in names
     assert not any("Entropy_raw_points" in p or "Entropy_normalized_points" in p or
                    "EntropyDots" in p for p in names)
     mapping = pd.read_csv(tmp_path / figure_data.FIGURE_DATA_DIRNAME / "图表-数据对照表.csv")
@@ -170,7 +170,10 @@ def test_longitudinal_delta_exports_and_single_timepoint_omission(tmp_path, metr
                                               "true_normal_available": metric == "NMD"}}}
     paths = figure_data.export_figure_data_tables(results, tmp_path / "clinical")
     names = {p.name for p in paths}
-    for fig, name in (("09", metric), ("10", "Entropy")):
+    assert not any("Fig09" in name or "Fig10" in name for name in names)
+    assert f"Fig02_{metric}_normalized_bars.csv" not in names
+    assert "Fig04_Entropy_normalized_bars.csv" not in names
+    for fig, name in (("02", metric), ("04", "Entropy")):
         filename = f"Fig{fig}_{name}_baseline_aligned_normalized_bars.csv"
         assert filename in names
         table = pd.read_csv(tmp_path / "clinical" / figure_data.FIGURE_DATA_DIRNAME /
@@ -184,6 +187,8 @@ def test_longitudinal_delta_exports_and_single_timepoint_omission(tmp_path, metr
     results["experiments"]["Clinical"]["sample_level"] = samples[samples["Week"] == 0]
     paths = figure_data.export_figure_data_tables(results, tmp_path / "animal")
     assert not any("baseline_aligned_normalized" in p.name for p in paths)
+    assert f"Fig02_{metric}_normalized_bars.csv" in {p.name for p in paths}
+    assert "Fig04_Entropy_normalized_bars.csv" in {p.name for p in paths}
 
 
 def test_joint_charts_share_anchors_from_only_valid_joint_rows(tmp_path):
@@ -243,8 +248,8 @@ def test_aligned_point_exports_share_curve_anchors(tmp_path):
                                               "true_normal_available": True}}}
     paths = figure_data.export_figure_data_tables(results, tmp_path)
     folder = tmp_path / figure_data.FIGURE_DATA_DIRNAME / "Clinical"
-    bars = pd.read_csv(folder / "Fig09_NMD_baseline_aligned_normalized_bars.csv")
-    points = pd.read_csv(folder / "Fig09_NMD_baseline_aligned_normalized_points.csv")
+    bars = pd.read_csv(folder / "Fig02_NMD_baseline_aligned_normalized_bars.csv")
+    points = pd.read_csv(folder / "Fig02_NMD_baseline_aligned_normalized_points.csv")
     # Shared change range is [-6,0]. Treatment raw baselines are 12 and Placebo 10.
     baseline = {"Treatment": 12.0, "Placebo": 10.0}
     for (group, week), values in points.groupby(["Group", "Week"], sort=False):
@@ -252,7 +257,7 @@ def test_aligned_point_exports_share_curve_anchors(tmp_path):
         expected = 100 * np.clip((raw - baseline[group] + 6) / 6, 0, 1) ** 3
         np.testing.assert_allclose(values.Value, expected)
     assert bars.loc[bars.Week == 0, "Baseline_aligned_display_0_100_gamma3"].eq(100).all()
-    assert not any("Fig10" in p.name and "points" in p.name for p in paths)
+    assert not any("Fig04" in p.name and "points" in p.name for p in paths)
     plotted = plots._baseline_aligned_points(samples, "Clinical",
         plots._baseline_aligned_display_table(summary, "NMD_mean"), "NMD_mean")
     for key, values in plotted.items():

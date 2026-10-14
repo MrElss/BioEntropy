@@ -29,10 +29,10 @@
 
 图形数据中的 `Baseline_week`、`Baseline_value` 和 `Change_from_baseline` 分别记录
 每组实际使用的基线周、该周原始指标值及当前值减基线值。优先使用0W，缺失时使用最早有效周；
-不足两个有效时间点不定义变化轨迹。这些仅供主图09/10展示，不改写原始指标或增加统计检验。
+不足两个有效时间点不定义变化轨迹。这些仅供主图02/04展示，不改写原始指标或增加统计检验。
 归一化个体散点和组曲线共用组汇总值拟合的锚点，熵图仅显示组水平指标。
 
-主图09/10中 `Common_baseline` 为符合条件各组基线的算术平均，`Aligned_value`
+主图02/04中 `Common_baseline` 为符合条件各组基线的算术平均，`Aligned_value`
 为原值减本组基线再加共同基线。`Display_min` / `Display_max` / `Display_range_rule`
 记录实验内统一缩放参数；`Baseline_aligned_linear_0_100` 和
 `Baseline_aligned_display_0_100_gamma3` 分别为线性和最终展示值。
