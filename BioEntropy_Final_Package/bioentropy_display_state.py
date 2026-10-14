@@ -14,3 +14,6 @@ CURRENT_DISPLAY_EXPERIMENT: Optional[str] = None
 # each subject's raw value on top of the group bar without threading the frame
 # through the whole plotting call stack. None ⇒ no overlay.
 CURRENT_SAMPLE_LEVEL: Optional[Any] = None
+# Group summary used to fit the common display anchors for group estimates and
+# individual points. Like sample-level data, this is scoped to a render pass.
+CURRENT_SUMMARY: Optional[Any] = None

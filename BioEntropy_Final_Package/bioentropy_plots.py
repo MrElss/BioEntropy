@@ -68,6 +68,8 @@ __all__ = [
     "_signif_label",
     "plot_entropy_trajectory",
     "plot_entropy_baseline_aligned",
+    "plot_burden_baseline_aligned",
+    "_baseline_change_table",
     "plot_true_normal_nmd_trajectory",
     "plot_true_normal_nmd_baseline_aligned",
     "plot_true_normal_nmd_entropy_3d",
@@ -97,6 +99,7 @@ __all__ = [
     "_normalize_anchor_linear_0_100",
     "_contrast_enhance_0_100",
     "_normalize_display_window",
+    "_normalize_values_for_metric",
     "build_display_normalized_metric_table",
     "plot_normalized_metric_index",
     "plot_normalized_burden_index",
@@ -369,15 +372,14 @@ def _ordered_single_timepoint_groups(sub: pd.DataFrame, value_col: str) -> List[
 
 def _per_sample_points_for_metric(
     experiment: str, metric_col: str, groups: List[str], normalize: Optional[str] = None,
+    reference_summary: Optional[pd.DataFrame] = None,
 ) -> Dict[str, np.ndarray]:
     """Per-subject values to overlay on a single-timepoint group chart.
 
     Reads the render-pass sample-level frame from display state. NMD / NRBS / BRI
-    map to their own per-sample column directly; Entropy has no per-sample value
-    (entropy is a group-level covariance quantity), so each subject's
-    reference-state entropy contribution 0.5·ln(2πe·NMD²) is used — the same
-    formula the bar aggregates over its NMD distribution, so the dots sit on the
-    bar's scale. ``normalize`` puts the values on the chart's 0–100 scale:
+    map to their own per-sample column directly. Entropy is a group statistic;
+    individual log-distance values are not plotted as individual Entropy.
+    ``normalize`` applies the group-summary anchors to the individual values:
     ``"display"`` = linear anchor + gamma (the normalized bars), ``"linear"`` =
     linear anchor only (the state plots); ``None`` keeps raw values.
     """
@@ -391,34 +393,25 @@ def _per_sample_points_for_metric(
         return {}
     base = str(metric_col)[:-5] if str(metric_col).endswith("_mean") else str(metric_col)
     if base == "Entropy":
-        if "NMD" not in sub.columns:
-            return {}
-        src, transform = "NMD", True
+        return {}
     elif base in sub.columns:
-        src, transform = base, False
+        src = base
     else:
         return {}
     out: Dict[str, np.ndarray] = {}
     for g in groups:
         v = pd.to_numeric(sub.loc[sub["Group"].astype(str) == str(g), src], errors="coerce").to_numpy(dtype=float)
         v = v[np.isfinite(v)]
-        if transform:
-            v = v[v > 0]
-            if v.size:
-                v = 0.5 * np.log(2 * np.pi * np.e * v * v)
         if v.size:
             out[str(g)] = v
     if normalize and out:
         flat_vals: List[float] = []
-        flat_grp: List[str] = []
         for g, arr in out.items():
             flat_vals.extend(float(x) for x in arr)
-            flat_grp.extend([g] * len(arr))
-        series, grp = pd.Series(flat_vals, dtype=float), pd.Series(flat_grp)
-        if normalize == "linear":
-            norm = _normalize_anchor_linear_0_100(series, grp).to_numpy(dtype=float)
-        else:
-            norm = _normalize_display_window(series, grp).to_numpy(dtype=float)
+        ref = _display_reference_summary(experiment, reference_summary)
+        norm = _normalize_values_for_metric(
+            pd.Series(flat_vals, dtype=float), metric_col, ref, normalize=normalize,
+        ).to_numpy(dtype=float)
         out2: Dict[str, np.ndarray] = {}
         i = 0
         for g, arr in out.items():
@@ -459,13 +452,14 @@ def _overlay_trajectory_points(
     ax, experiment: str, metric_col: str, weeks: List[int], groups: List[str],
     cmap: Dict[str, str], size: float = 7, alpha: float = 0.16, jitter: float = 1.4,
     normalize: Optional[str] = None,
+    reference_summary: Optional[pd.DataFrame] = None,
 ) -> List[float]:
     """Overlay each subject's per-week value (jittered in x) under a longitudinal
     trajectory, coloured by group. Reads the render-pass sample-level frame from
     display state. Points sit behind the lines (low zorder / alpha) so the group
     trajectories stay legible. Returns the flat list of plotted values so callers
     can pad the y-limit. NMD / NRBS / BRI use their own per-sample column;
-    Entropy uses each subject's reference-state contribution 0.5·ln(2πe·NMD²).
+    Entropy has no individual-value overlay because it is a group statistic.
     ``normalize="display"`` puts the values on the 0–100 display scale (linear
     anchor + gamma) so they share the normalized charts' y-axis."""
     sl = getattr(_dstate, "CURRENT_SAMPLE_LEVEL", None)
@@ -478,36 +472,31 @@ def _overlay_trajectory_points(
         return []
     base = str(metric_col)[:-5] if str(metric_col).endswith("_mean") else str(metric_col)
     if base == "Entropy":
-        if "NMD" not in sub.columns:
-            return []
-        src, transform = "NMD", True
+        return []
     elif base in sub.columns:
-        src, transform = base, False
+        src = base
     else:
         return []
     wk = pd.to_numeric(sub["Week"], errors="coerce")
     # Pass 1: collect each (group, week) transformed array.
     cells: Dict[Tuple[int, int], np.ndarray] = {}
     flat_vals: List[float] = []
-    flat_grp: List[str] = []
     for gi, group in enumerate(groups):
         gmask = sub["Group"].astype(str) == str(group)
         for w in weeks:
             v = pd.to_numeric(sub.loc[gmask & (wk == int(w)), src], errors="coerce").to_numpy(dtype=float)
             v = v[np.isfinite(v)]
-            if transform:
-                v = v[v > 0]
-                if v.size:
-                    v = 0.5 * np.log(2 * np.pi * np.e * v * v)
             if v.size == 0:
                 continue
             cells[(gi, int(w))] = v
             flat_vals.extend(float(x) for x in v)
-            flat_grp.extend([str(group)] * v.size)
     if not cells:
         return []
     if normalize:
-        norm = _normalize_display_window(pd.Series(flat_vals, dtype=float), pd.Series(flat_grp)).to_numpy(dtype=float)
+        ref = _display_reference_summary(experiment, reference_summary)
+        norm = _normalize_values_for_metric(
+            pd.Series(flat_vals, dtype=float), metric_col, ref, normalize=normalize,
+        ).to_numpy(dtype=float)
         i = 0
         for key in list(cells):
             n = cells[key].size
@@ -646,22 +635,19 @@ def _plot_burden_entropy_single_group_bar(
                     ha="center", va="bottom", fontsize=8.0)
     # Overlay each subject's value on the two bars (0–100 display scale).
     _overlay_group_points(ax, x - width / 2, groups,
-                          _per_sample_points_for_metric(experiment, burden_col, groups, normalize="display"),
-                          jitter_width=width * 0.7, size=12)
-    _overlay_group_points(ax, x + width / 2, groups,
-                          _per_sample_points_for_metric(experiment, "Entropy", groups, normalize="display"),
+                          _per_sample_points_for_metric(experiment, burden_col, groups, normalize="display", reference_summary=plot_df),
                           jitter_width=width * 0.7, size=12)
     ax.set_xticks(x)
     ax.set_xticklabels([display_group_name(g, i) for i, g in enumerate(groups)], rotation=20, ha="right")
     ax.set_xlabel("Treatment group")
-    ax.set_ylabel("Normalized group mean (0–100)")
+    ax.set_ylabel("Normalized group estimate (0–100)")
     ax.set_ylim(0, 115)
     _legacy._format_axis(ax)
     _apply_academic_axis(ax, "y")
     note = (
-        f"Single-timepoint experiment: the x-axis shows treatment groups, not weeks. "
-        f"Within each group, the left / right bars show {meta['short']} and Entropy. "
-        f"Bar heights use anchored display normalization when Normal and model controls are present (Normal=0, model=100), then gamma={DISPLAY_CONTRAST_GAMMA:g} display contrast; labels above bars are raw values."
+        f"Left / right bars: {meta['short']} / group Entropy; labels: raw estimates. "
+        f"Bars and burden dots share group-summary anchors (Normal/model, otherwise min-max), clip to 0-100 and gamma={DISPLAY_CONTRAST_GAMMA:g}. "
+        "A transformed group estimate need not equal the mean of transformed dots. Boundary values indicate display clipping, not biological limits. Entropy has no individual dots."
     )
     _legacy._add_top_title_and_note(
         fig,
@@ -907,8 +893,8 @@ def plot_entropy_trajectory(summary_df: pd.DataFrame, experiment: str, out_path:
                         ha="center", va="bottom" if idx == 0 else "top", fontsize=8.5, color=color,
                         zorder=7)
     
-    # Overlay each subject's per-week entropy contribution as a faint cloud.
-    pv = _overlay_trajectory_points(ax, experiment, "Entropy", weeks, groups, cmap)
+    # Entropy is a group estimate, not the mean of individual log distances.
+    pv = []
     ax.set_xticks(weeks)
     ax.set_xticklabels([f"{w}W" for w in weeks])
     ax.set_xlabel("Week")
@@ -936,7 +922,7 @@ def plot_entropy_trajectory(summary_df: pd.DataFrame, experiment: str, out_path:
     _legacy._add_top_title_and_note(
         fig,
         title=f"Experiment {experiment}: Entropy trajectory",
-        note="Points are entropy estimates; error bars are 95% bootstrap CIs. X-axis follows uploaded weeks (e.g. 0W, 6W, 12W, 18W, 24W).",
+        note="Line markers are group Entropy estimates; error bars are 95% bootstrap CIs. No individual Entropy values are plotted. X-axis follows uploaded weeks.",
         legend_handles=legend_handles,
         legend_labels=legend_labels,
         legend_ncol=min(len(legend_labels), 4),
@@ -951,76 +937,90 @@ def plot_entropy_trajectory(summary_df: pd.DataFrame, experiment: str, out_path:
     plt.close(fig)
 
 
+def _plot_metric_baseline_change(
+    summary_df: pd.DataFrame, experiment: str, out_path: Path,
+    metric_col: str, metric_label: str,
+    treatment_group: Optional[str] = None,
+    comparator_group: Optional[str] = None,
+) -> None:
+    sub = summary_df.copy()
+    if "Experiment" in sub.columns:
+        sub = sub.loc[sub["Experiment"].astype(str) == str(experiment)].copy()
+    if metric_col not in sub.columns or _is_single_timepoint(sub):
+        return
+    aligned = _baseline_change_table(sub, metric_col)
+    aligned = aligned.loc[np.isfinite(aligned["Change_from_baseline"])].copy()
+    if aligned.empty:
+        return
+    aligned["Week"] = pd.to_numeric(aligned["Week"], errors="coerce")
+    weeks, groups = _get_weeks_and_groups(aligned, treatment_group, comparator_group)
+    cmap = _ensure_group_color_map(groups, treatment_group, comparator_group)
+    # Rank labels within each week so crossing/nearby trajectories keep their
+    # labels on the outside. Equal baseline values use the stable group order.
+    group_rank = {str(group): i for i, group in enumerate(groups)}
+    label_offsets = {}
+    for week, week_rows in aligned.groupby("Week", sort=False):
+        ordered = sorted(
+            week_rows.to_dict("records"),
+            key=lambda row: (-float(row["Change_from_baseline"]), group_rank.get(str(row["Group"]), len(groups))),
+        )
+        upper_count = (len(ordered) + 1) // 2
+        for rank, row in enumerate(ordered):
+            offset = (8 + 10 * (upper_count - rank - 1)) if rank < upper_count else (-8 - 10 * (rank - upper_count))
+            label_offsets[(str(row["Group"]), float(week))] = offset
+    fig, ax = plt.subplots(figsize=(10.2, 6.4))
+    handles, labels = [], []
+    for idx, group in enumerate(groups):
+        g = aligned.loc[aligned["Group"].astype(str) == str(group)].sort_values("Week")
+        if g.empty:
+            continue
+        color = cmap.get(group, _FALLBACK_COLORS[idx % len(_FALLBACK_COLORS)])
+        ax.plot(g["Week"], g["Change_from_baseline"], marker="o", linewidth=2,
+                color=color, markeredgecolor="white", zorder=4)
+        baseline_week = float(g["Baseline_week"].iloc[0])
+        handles.append(_legacy._Line2D([0], [0], color=color, marker="o", linewidth=2))
+        labels.append(f"{display_group_name(group, idx)} (baseline {baseline_week:g}W)")
+        for _, row in g.iterrows():
+            offset = label_offsets[(str(group), float(row["Week"]))]
+            ax.annotate(f"{row['Change_from_baseline']:+.3g}",
+                        (float(row["Week"]), float(row["Change_from_baseline"])),
+                        xytext=(0, offset), textcoords="offset points",
+                        ha="center", va="bottom" if offset > 0 else "top",
+                        fontsize=8, color=color, zorder=6)
+    ax.axhline(0, color="#666666", linestyle="--", linewidth=1)
+    ax.set_xticks(weeks)
+    ax.set_xticklabels([f"{w:g}W" for w in weeks])
+    ax.set_xlabel("Week")
+    ax.set_ylabel(f"Change in {metric_label} from own baseline (original units)")
+    ax.margins(y=0.16)
+    _legacy._format_axis(ax)
+    _legacy._add_top_title_and_note(
+        fig, title=f"Experiment {experiment}: {metric_label} change from own baseline",
+        note=("Each group estimate minus its own 0W estimate; if 0W is unavailable, the earliest valid week is used and shown in the legend. "
+              "Negative values indicate a decrease. Original units; no gamma or percentage scaling. "
+              "Descriptive group changes only; no paired-subject inference or change-score confidence interval is implied."),
+        legend_handles=handles, legend_labels=labels, legend_ncol=min(len(labels), 3),
+        legend_y=0.865, title_y=0.985, note_y=0.948, note_width=122, note_fontsize=8.6,
+    )
+    fig.tight_layout(rect=[0.05, 0.06, 0.98, 0.79])
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_entropy_baseline_aligned(summary_df: pd.DataFrame, experiment: str, out_path: Path,
                                   treatment_group: Optional[str] = None,
                                   comparator_group: Optional[str] = None) -> None:
-    sub = summary_df.copy()
-    if "Experiment" in sub.columns:
-        sub = sub[sub["Experiment"].astype(str) == str(experiment)].copy()
-    sub = sub[[c for c in ["Week", "Group", "Entropy"] if c in sub.columns]].dropna(subset=["Entropy"]).copy()
-    if sub.empty:
-        return
-    sub["Week"] = pd.to_numeric(sub["Week"], errors="coerce").astype(int)
-    if _is_single_timepoint(sub):
-        _plot_single_metric_by_group(
-            sub, experiment, out_path,
-            metric_col="Entropy",
-            ylabel="Entropy",
-            title=f"Experiment {experiment}: Entropy by treatment group",
-            note="Single-timepoint experiment: baseline-aligned change is not applicable, so groups are compared directly on the x-axis.",
-            treatment_group=treatment_group,
-            comparator_group=comparator_group,
-        )
-        return
-    weeks, groups = _get_weeks_and_groups(sub, treatment_group, comparator_group)
-    cmap = _ensure_group_color_map(groups, treatment_group, comparator_group)
-    
-    rows = []
-    for g in groups:
-        gg = sub[sub["Group"].astype(str) == g].sort_values("Week").copy()
-        if gg.empty:
-            continue
-        baseline_week = 0 if 0 in gg["Week"].values else int(gg["Week"].min())
-        baseline = float(gg.loc[gg["Week"] == baseline_week, "Entropy"].iloc[0])
-        gg["DeltaEntropy"] = gg["Entropy"] - baseline
-        rows.append(gg)
-    if not rows:
-        return
-    al = pd.concat(rows, ignore_index=True)
-    
-    fig, ax = plt.subplots(figsize=(10.2, 6.2))
-    legend_handles, legend_labels = [], []
-    for idx, group in enumerate(groups):
-        g = al[al["Group"].astype(str) == group].sort_values("Week")
-        color = cmap.get(group, _FALLBACK_COLORS[idx % len(_FALLBACK_COLORS)])
-        ax.plot(g["Week"], g["DeltaEntropy"], marker="o", linewidth=2.0, color=color)
-        legend_handles.append(_legacy._Line2D([0], [0], color=color, marker="o", linewidth=2.0))
-        legend_labels.append(display_group_name(group, idx))
-        for _, row in g.iterrows():
-            ax.text(float(row["Week"]), float(row["DeltaEntropy"]) + 0.06, f"{row['DeltaEntropy']:+.2f}",
-                    ha="center", va="bottom", fontsize=8.4, color=color)
-    ax.axhline(0, color="#666666", linestyle="--", linewidth=1.0)
-    ax.set_xticks(weeks)
-    ax.set_xticklabels([f"{w}W" for w in weeks])
-    ax.set_xlabel("Week")
-    ax.set_ylabel("ΔEntropy vs baseline")
-    _legacy._format_axis(ax)
-    _legacy._add_top_title_and_note(
-        fig,
-        title=f"Experiment {experiment}: Baseline-aligned entropy change",
-        note="Each group is aligned to its own baseline (0W if available; otherwise the earliest uploaded week). This answers the request of placing 0W at the same starting point.",
-        legend_handles=legend_handles,
-        legend_labels=legend_labels,
-        legend_ncol=min(len(legend_labels), 4),
-        legend_y=0.885,
-        title_y=0.985,
-        note_y=0.948,
-        note_width=120,
-        note_fontsize=8.7,
-    )
-    fig.tight_layout(rect=[0.05, 0.06, 0.98, 0.82])
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
-    plt.close(fig)
+    _plot_metric_baseline_change(summary_df, experiment, out_path, "Entropy", "Entropy",
+                                 treatment_group, comparator_group)
+
+
+def plot_burden_baseline_aligned(summary_df: pd.DataFrame, experiment: str, out_path: Path,
+                                 burden_kind: str = "NMD",
+                                 treatment_group: Optional[str] = None,
+                                 comparator_group: Optional[str] = None) -> None:
+    meta = _burden_metadata(burden_kind)
+    _plot_metric_baseline_change(summary_df, experiment, out_path, meta["mean"], meta["short"],
+                                 treatment_group, comparator_group)
 
 
 def plot_true_normal_nmd_trajectory(summary_df: pd.DataFrame, experiment: str, out_path: Path,
@@ -1119,69 +1119,8 @@ def plot_true_normal_nmd_trajectory(summary_df: pd.DataFrame, experiment: str, o
 def plot_true_normal_nmd_baseline_aligned(summary_df: pd.DataFrame, experiment: str, out_path: Path,
                                           treatment_group: Optional[str] = None,
                                           comparator_group: Optional[str] = None) -> None:
-    sub = summary_df.copy()
-    if "Experiment" in sub.columns:
-        sub = sub[sub["Experiment"].astype(str) == str(experiment)].copy()
-    sub = sub[[c for c in ["Week", "Group", "NMD_mean"] if c in sub.columns]].dropna(subset=["NMD_mean"]).copy()
-    if sub.empty:
-        return
-    sub["Week"] = pd.to_numeric(sub["Week"], errors="coerce").astype(int)
-    if _is_single_timepoint(sub):
-        _plot_single_metric_by_group(
-            sub, experiment, out_path,
-            metric_col="NMD_mean",
-            ylabel="Full-covariance Normal distance (NMD)",
-            title=f"Experiment {experiment}: NMD by treatment group",
-            note="Single-timepoint experiment: baseline-aligned change is not applicable, so groups are compared directly on the x-axis.",
-            treatment_group=treatment_group,
-            comparator_group=comparator_group,
-        )
-        return
-    weeks, groups = _get_weeks_and_groups(sub, treatment_group, comparator_group)
-    cmap = _ensure_group_color_map(groups, treatment_group, comparator_group)
-    rows = []
-    for g in groups:
-        gg = sub[sub["Group"].astype(str) == g].sort_values("Week").copy()
-        baseline_week = 0 if 0 in gg["Week"].values else int(gg["Week"].min())
-        baseline = float(gg.loc[gg["Week"] == baseline_week, "NMD_mean"].iloc[0])
-        gg["DeltaNMD"] = gg["NMD_mean"] - baseline
-        rows.append(gg)
-    if not rows:
-        return
-    al = pd.concat(rows, ignore_index=True)
-    fig, ax = plt.subplots(figsize=(10.2, 6.2))
-    legend_handles, legend_labels = [], []
-    for idx, group in enumerate(groups):
-        g = al[al["Group"].astype(str) == group].sort_values("Week")
-        color = cmap.get(group, _FALLBACK_COLORS[idx % len(_FALLBACK_COLORS)])
-        ax.plot(g["Week"], g["DeltaNMD"], marker="o", linewidth=2.0, color=color)
-        legend_handles.append(_legacy._Line2D([0], [0], color=color, marker="o", linewidth=2.0))
-        legend_labels.append(display_group_name(group, idx))
-        for _, row in g.iterrows():
-            ax.text(float(row["Week"]), float(row["DeltaNMD"]) + 0.08, f"{row['DeltaNMD']:+.2f}",
-                    ha="center", va="bottom", fontsize=8.4, color=color)
-    ax.axhline(0, color="#666666", linestyle="--", linewidth=1.0)
-    ax.set_xticks(weeks)
-    ax.set_xticklabels([f"{w}W" for w in weeks])
-    ax.set_xlabel("Week")
-    ax.set_ylabel("ΔNMD vs baseline")
-    _legacy._format_axis(ax)
-    _legacy._add_top_title_and_note(
-        fig,
-        title=f"Experiment {experiment}: Baseline-aligned NMD change",
-        note="Each group is aligned to its own baseline (0W if available; otherwise the earliest uploaded week). Values below 0 indicate reduced disease burden relative to baseline.",
-        legend_handles=legend_handles,
-        legend_labels=legend_labels,
-        legend_ncol=min(len(legend_labels), 4),
-        legend_y=0.885,
-        title_y=0.985,
-        note_y=0.948,
-        note_width=118,
-        note_fontsize=8.5,
-    )
-    fig.tight_layout(rect=[0.05, 0.06, 0.98, 0.82])
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
-    plt.close(fig)
+    plot_burden_baseline_aligned(summary_df, experiment, out_path, "NMD",
+                                 treatment_group, comparator_group)
 
 
 def plot_true_normal_nmd_entropy_3d(
@@ -2838,7 +2777,7 @@ def plot_single_timepoint_nmd_entropy_state(
     # Overlay each subject's burden value (jittered) around its group marker.
     pv = _overlay_group_points(
         ax, xpos, groups,
-        _per_sample_points_for_metric(experiment, bcol, groups, normalize=("linear" if normalized else None)),
+        _per_sample_points_for_metric(experiment, bcol, groups, normalize=("linear" if normalized else None), reference_summary=sub),
         jitter_width=0.34, size=14)
     ax.set_xticks(list(xpos))
     rot = 20 if len(groups) > 4 else 0
@@ -2854,7 +2793,13 @@ def plot_single_timepoint_nmd_entropy_state(
     ax.set_ylim(y_lo - ypad, y_hi + ypad)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
-    fig.tight_layout()
+    if normalized:
+        fig.text(0.5, 0.012,
+                 "Group markers and individual burden dots share group-summary anchors; values outside the anchor interval are clipped to 0-100. No gamma here.",
+                 ha="center", va="bottom", fontsize=7, wrap=True)
+        fig.tight_layout(rect=[0, 0.04, 1, 1])
+    else:
+        fig.tight_layout()
     fig.savefig(str(out_path), dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
 
@@ -3532,6 +3477,99 @@ def _normalize_display_window(values: pd.Series, groups: Optional[pd.Series] = N
     return _contrast_enhance_0_100(_normalize_anchor_linear_0_100(values, groups))
 
 
+def _display_reference_summary(
+    experiment: str, reference_summary: Optional[pd.DataFrame] = None,
+) -> pd.DataFrame:
+    """Return the experiment's group-summary anchors without using sample data."""
+    ref = reference_summary if reference_summary is not None else _dstate.CURRENT_SUMMARY
+    if not isinstance(ref, pd.DataFrame):
+        return pd.DataFrame()
+    if "Experiment" in ref.columns:
+        ref = ref.loc[ref["Experiment"].astype(str) == str(experiment)]
+    return ref
+
+
+def _normalize_values_for_metric(
+    values: pd.Series, metric_col: str, reference_summary: pd.DataFrame,
+    normalize: str = "display",
+) -> pd.Series:
+    """Apply one experiment's group-summary display anchors to arbitrary values.
+
+    The anchors have the same definition as ``_normalize_anchor_linear_0_100``:
+    mean Normal/model group estimates if both differ, otherwise the minimum and
+    maximum group estimates. Individual values never refit the anchors. Values
+    beyond the anchor interval are clipped for display only. The input index is
+    retained; neither the values nor the reference summary is modified.
+    """
+    if normalize not in {"linear", "display"}:
+        raise ValueError("normalize must be 'linear' or 'display'")
+    s = pd.to_numeric(values, errors="coerce").astype(float)
+    empty = pd.Series(np.nan, index=s.index, dtype=float)
+    if not isinstance(reference_summary, pd.DataFrame) or reference_summary.empty:
+        return empty
+    base = str(metric_col).removesuffix("_mean")
+    candidates = [f"{base}_mean", base] if base in {"NMD", "BRI", "NRBS"} else [str(metric_col)]
+    ref_col = next((c for c in candidates if c in reference_summary.columns), None)
+    if ref_col is None:
+        return empty
+    ref = pd.to_numeric(reference_summary[ref_col], errors="coerce").astype(float)
+    finite = np.isfinite(ref)
+    usable = ref[finite]
+    if usable.empty:
+        return empty
+    anchors = None
+    if "Group" in reference_summary.columns:
+        groups = reference_summary["Group"].astype(str)
+        normal = ref[finite & groups.map(_is_healthy_reference_group)]
+        model = ref[finite & groups.map(_is_model_control_group)]
+        if not normal.empty and not model.empty:
+            lo, hi = float(normal.mean()), float(model.mean())
+            if not math.isclose(lo, hi):
+                anchors = (lo, hi)
+    if anchors is None:
+        anchors = (float(usable.min()), float(usable.max()))
+    lo, hi = anchors
+    if math.isclose(lo, hi):
+        linear = pd.Series(50.0, index=s.index, dtype=float)
+    else:
+        linear = ((s - lo) / (hi - lo) * 100.0).clip(lower=0.0, upper=100.0)
+    return _contrast_enhance_0_100(linear) if normalize == "display" else linear
+
+
+def _baseline_change_table(summary_df: pd.DataFrame, metric_col: str) -> pd.DataFrame:
+    """Return group-estimate changes in original units, with explicit baselines.
+
+    Each experiment/group requires two valid weeks. Its 0W estimate is the
+    baseline when present; otherwise the earliest valid week is used. A single
+    uploaded time point is not treated as longitudinal evidence. No CI or
+    individual paired change is inferred from these group estimates.
+    """
+    out = summary_df.copy()
+    for name in ("Baseline_week", "Baseline_value", "Change_from_baseline"):
+        out[name] = np.nan
+    out["Baseline_reference"] = "unavailable_single_timepoint"
+    if not {"Week", "Group", metric_col}.issubset(out.columns):
+        return out
+    weeks = pd.to_numeric(out["Week"], errors="coerce")
+    values = pd.to_numeric(out[metric_col], errors="coerce")
+    keys = [c for c in ("Experiment", "Group") if c in out.columns]
+    for positions in out.groupby(keys, dropna=False, sort=False).indices.values():
+        valid = positions[np.isfinite(weeks.iloc[positions]) & np.isfinite(values.iloc[positions])]
+        valid_weeks = weeks.iloc[valid]
+        if valid_weeks.nunique() < 2:
+            continue
+        baseline_week = 0.0 if (valid_weeks == 0).any() else float(valid_weeks.min())
+        baseline_pos = valid[np.flatnonzero(valid_weeks.to_numpy() == baseline_week)[0]]
+        baseline_value = float(values.iloc[baseline_pos])
+        out.iloc[positions, out.columns.get_loc("Baseline_week")] = baseline_week
+        out.iloc[positions, out.columns.get_loc("Baseline_value")] = baseline_value
+        out.iloc[valid, out.columns.get_loc("Change_from_baseline")] = values.iloc[valid].to_numpy() - baseline_value
+        out.iloc[positions, out.columns.get_loc("Baseline_reference")] = (
+            "0W" if baseline_week == 0 else "earliest_available_week"
+        )
+    return out
+
+
 def build_display_normalized_metric_table(results: Dict[str, Any]) -> pd.DataFrame:
     rows: List[pd.DataFrame] = []
     for exp, exp_res in results.get("experiments", {}).items():
@@ -3619,13 +3657,13 @@ def plot_normalized_metric_index(
                         ha="center", va="bottom", fontsize=7.0, color=_TEXT_COLOR)
         # Overlay each subject's value on the same 0–100 display scale.
         _overlay_group_points(ax, x, groups,
-                              _per_sample_points_for_metric(experiment, metric_col, groups, normalize="display"))
+                              _per_sample_points_for_metric(experiment, metric_col, groups, normalize="display", reference_summary=sub))
         ax.set_xticks(x)
         ax.set_xticklabels([display_group_name(g, i) for i, g in enumerate(groups)], rotation=24, ha="right")
         ax.set_xlabel("Treatment group")
         note = (
-            f"Single-timepoint experiment: {metric_label} is normalized for display. Linear anchors set Normal=0 and model=100 when available, "
-            f"otherwise fall back to experiment min-max; plotted bars use gamma={DISPLAY_CONTRAST_GAMMA:g} therapeutic-window contrast. Labels show display and raw values; linear values remain in Excel."
+            f"{metric_label}: group-summary anchors (Normal=0, model=100; otherwise experiment min-max), "
+            f"clipped to 0-100 then gamma={DISPLAY_CONTRAST_GAMMA:g}. Labels show display and raw values; linear values remain in Excel."
         )
     else:
         weeks, groups = _get_weeks_and_groups(sub, treatment_group, comparator_group)
@@ -3645,14 +3683,18 @@ def plot_normalized_metric_index(
                             xytext=(0, 7 if idx == 0 else -7), textcoords="offset points",
                             ha="center", va="bottom" if idx == 0 else "top", fontsize=7.2, color=color, zorder=7)
         # Overlay each subject's value on the same 0–100 display scale.
-        _overlay_trajectory_points(ax, experiment, metric_col, weeks, groups, cmap, normalize="display")
+        _overlay_trajectory_points(ax, experiment, metric_col, weeks, groups, cmap, normalize="display", reference_summary=sub)
         ax.set_xticks(weeks)
         ax.set_xticklabels([f"{w}W" for w in weeks])
         ax.set_xlabel("Week")
         note = (
-            f"{metric_label} is normalized for display. Linear anchors set Normal=0 and model=100 when available, otherwise fall back to experiment min-max; "
-            f"plotted values use gamma={DISPLAY_CONTRAST_GAMMA:g} therapeutic-window contrast. Linear values are retained in Excel."
+            f"{metric_label}: group-summary anchors (Normal=0, model=100; otherwise experiment min-max), "
+            f"clipped to 0-100 then gamma={DISPLAY_CONTRAST_GAMMA:g}. Linear values are retained in Excel."
         )
+    if str(metric_col) == "Entropy":
+        note += " Group Entropy estimates only; no individual Entropy dots. Display 0/100 are boundaries, not zero entropy or biological limits."
+    else:
+        note += " Group estimates and individual dots share these anchors. With clipping/gamma, the line or bar need not equal the dot mean. Display 0/100 are boundaries, not biological limits."
     ax.set_ylabel(f"{raw_label}\ndisplay index (0-100)")
     ax.set_ylim(-4, 112)
     _legacy._format_axis(ax)

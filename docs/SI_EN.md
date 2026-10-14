@@ -88,7 +88,21 @@ Nominal 95% bootstrap intervals use the 2.5th and 97.5th percentiles. Group mean
 
 Burden contrasts also receive two-sided Mann–Whitney tests. For entropy differences, the exported bootstrap sign summary is twice the smaller proportion of resampled differences ≤0 or ≥0; this is a descriptive sign-proportion statistic rather than a separately calibrated null-resampling test. Spearman associations, visit-level linear trends and within-experiment standardized pooled associations are exploratory summaries. They are not subject-level repeated-measures models. Selected p-value families receive Benjamini–Hochberg adjustment [2], with adjusted columns identified by the fdr_bh suffix; this is not a single correction over every output.
 
-Raw group distance plots display mean D; state-score plots display Eq. S6. Individual state-score dots can use ln(D)+½ln(2πe) for positive D, whose arithmetic mean generally differs from Eq. S6. Zero distances are omitted from these logarithmic overlays. Optional normalized displays anchor normal and model means at 0 and 100 when available, otherwise use within-experiment min–max scaling; equal values map to 50. The linear index L is clipped to [0,100], and contrast enhancement applies 100(L/100)³. These display transforms and separately scaled individual overlays are not effect sizes; raw estimates and intervals govern quantitative interpretation.
+## Graphical summaries and baseline change
+
+The software retains raw group estimates and their existing intervals. Distance plots show mean D. Entropy plots show the selected group score, with the method field distinguishing Hstate from Hcov. No individual ln(D)+½ln(2πe) dots are overlaid on Entropy plots or the Entropy panels of combined figures: their mean generally differs from Hstate, and they do not represent individual contributions to Hcov. Raw individual NMD, BRI and NRBS observations remain in the data outputs.
+
+Within each normalized figure, each metric uses one set of anchors fitted to the valid group-summary rows for that experiment. Distinct available normal and model means define 0 and 100; otherwise summary minima and maxima define the range. Combined displays first require both plotted metrics to be valid, so their eligible anchor rows can differ from a single-metric figure. The linear index L is clipped to [0,100]; a constant range gives L=50. Standard normalized displays use 100(L/100)³, whereas the single-visit state plot (Fig08) uses linear L. Where individual dots are shown, NMD, BRI or NRBS dots and group estimates share the same anchors, clipping and display transform. Dots never fit their own range. The multi-visit combined figure (Fig05) has no individual dots; its single-visit version can show burden dots. A transformed group estimate generally differs from the mean of transformed dots. Linear values remain in the exported data.
+
+Longitudinal outputs additionally provide baseline-change curves for the selected burden measure (NMD, NRBS or BRI) and Entropy. Let Xg,t denote the raw group estimate for group g at visit t, and bg its baseline visit. The plotted change is
+
+$$
+\Delta X_{g,t}=X_{g,t}-X_{g,b_g},\quad\Delta X_{g,b_g}=0\tag{S8}
+$$
+
+A finite 0W estimate is preferred. If unavailable, the earliest visit with a finite group estimate is used; its actual visit and value are recorded in the figure data. Thus groups with valid 0W estimates all start at zero. A nonzero-week fallback baseline is explicitly labelled and must not be described as 0W. A group needs at least two valid visits for a curve. A single-visit animal dataset does not receive a baseline-change plot merely because its internal label is 0W. These curves use raw differences without 0–100 normalization or cubic contrast. Raw and normalized level plots remain available.
+
+Baseline-change figures contain group curves only, without individual dots or change intervals. Shifting the original intervals would not account for uncertainty in the estimated baseline. Baseline subtraction leaves the original estimates, intervals, comparisons and effect sizes unchanged; it is not a paired individual-change analysis or baseline-adjusted ANCOVA. Visit-specific sample sizes and sample composition require review because composition changes can influence group trajectories. Entropy method labels must also agree before interpreting a longitudinal change. Zero means no change from the chosen baseline, not normal physiology or zero entropy.
 
 ## S7 Independent cross model effect size analysis
 
@@ -101,7 +115,7 @@ For the default composite, objective endpoints are retained only when the observ
 Let u denote this clipped standardized vector. A Ledoit–Wolf covariance is estimated from the normal-control u vectors. The distance is computed as follows, using a matrix pseudoinverse if inversion fails:
 
 $$
-D_{i,F}=\sqrt{u_i^T\widehat\Sigma_{C,F}^{-1}u_i}\tag{S8}
+D_{i,F}=\sqrt{u_i^T\widehat\Sigma_{C,F}^{-1}u_i}\tag{S9}
 $$
 
 The distance centre is the zero vector defined by the original normal mean and SD. Although covariance fitting centers its input, the distance calculation does not subtract a newly estimated mean after clipping. A separate unrestricted sensitivity output removes the ±3 cap and uses all eligible endpoints without the main direction-inclusion filter. Because both panel selection and clipping differ, that output does not isolate either change alone.
@@ -109,21 +123,21 @@ The distance centre is the zero vector defined by the original normal mean and S
 The forest output labelled entropy is based on the per-animal log-distance score
 
 $$
-E_i=\ln\!\left(\max(D_{i,F},10^{-9})\right)+\frac12\ln(2\pi e)\tag{S9}
+E_i=\ln\!\left(\max(D_{i,F},10^{-9})\right)+\frac12\ln(2\pi e)\tag{S10}
 $$
 
-Hedges’ g is calculated from E, not from group covariance entropy. The additive constant cancels in g. The module also exports descriptive group covariance entropies, but these do not enter this pooled entropy effect. The average of the individual scores in Eq. S9 generally differs from the group state score in Eq. S6. Linear-distance and log-distance effects summarize related information and cannot be treated as two independent confirmations.
+Hedges’ g is calculated from E, not from group covariance entropy. The additive constant cancels in g. The module also exports descriptive group covariance entropies, but these do not enter this pooled entropy effect. The average of the individual scores in Eq. S10 generally differs from the group state score in Eq. S6. Linear-distance and log-distance effects summarize related information and cannot be treated as two independent confirmations.
 
 ## Effect size and pooling formulas
 
 For either per-animal score x, a positive effect favors a smaller treatment score relative to PM. With treatment T, comparator C=PM, ν=nT+nC−2 and a nonzero pooled SD, the implementation uses the approximate Hedges correction [3]:
 
 $$
-s_p^2=\frac{(n_T-1)s_T^2+(n_C-1)s_C^2}{\nu},\quad d=\frac{\overline x_C-\overline x_T}{s_p}\tag{S10}
+s_p^2=\frac{(n_T-1)s_T^2+(n_C-1)s_C^2}{\nu},\quad d=\frac{\overline x_C-\overline x_T}{s_p}\tag{S11}
 $$
 
 $$
-J=1-\frac3{4\nu-1},\quad g=Jd,\quad v=J^2\left(\frac{n_T+n_C}{n_Tn_C}+\frac{d^2}{2(n_T+n_C)}\right)\tag{S11}
+J=1-\frac3{4\nu-1},\quad g=Jd,\quad v=J^2\left(\frac{n_T+n_C}{n_Tn_C}+\frac{d^2}{2(n_T+n_C)}\right)\tag{S12}
 $$
 
 Nonfinite observations are excluded from each score comparison; groups require at least two finite values. The per-model interval is g±1.96√v. This variance approximation treats the derived animal scores as observed values; it does not explicitly propagate uncertainty from the fitted normal reference, endpoint selection or clipping.
@@ -131,7 +145,7 @@ Nonfinite observations are excluded from each score comparison; groups require a
 Across k available models, fixed-effect inverse-variance weights are aj=1/vj. With fixed estimate gF, Q=Σaj(gj−gF)² and C=Σaj−Σaj²/Σaj, the DerSimonian–Laird estimate is τ²=max{0,[Q−(k−1)]/C} [4]. Random-effects weights and the pooled estimate are
 
 $$
-w_j=\frac1{v_j+\tau^2},\quad \widehat g_R=\frac{\sum_{j=1}^k w_jg_j}{\sum_{j=1}^k w_j}\tag{S12}
+w_j=\frac1{v_j+\tau^2},\quad \widehat g_R=\frac{\sum_{j=1}^k w_jg_j}{\sum_{j=1}^k w_j}\tag{S13}
 $$
 
 A normal-approximation interval uses SE=1/√Σwj. For k≥2, the additional modified Hartung–Knapp interval uses q=Σwj(gj−ĝR)²/(k−1), SEHK=√[max(1,q)/Σwj], and ĝR±t0.975,k−1 SEHK [5]. For three models the implemented t multiplier is 4.303. The max(1,q) safeguard prevents a smaller adjusted standard error than the conventional random-effects value. I²=max{0,[Q−(k−1)]/Q}×100% when Q>0. With one contributing model, there is no cross-model heterogeneity information and no HK interval.

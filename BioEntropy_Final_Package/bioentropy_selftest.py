@@ -53,12 +53,25 @@ def run_self_test(report_path: str) -> int:
             np.testing.assert_allclose(sample['NMD'], sample['NMD_covariance_raw'])
             np.testing.assert_allclose(summary['Entropy_covariance'], summary['Entropy_raw'])
             assert (summary['Entropy_n_adjusted_subjects'] == 0).all()
+            original_summary = summary.copy(deep=True)
             bundle = G.generate_output_bundle(result, package_name='BioEntropySelfTest',
                 audit_context={'inputs': provenance, 'role_map': roles, 'winsor_q': G.WINSOR_Q_DEFAULT,
                                'normal_reference_experiments': list(normals)})
             assert not bundle.get('audit_error')
             assert len(bundle['figure_paths']) > 0 and len(bundle['figure_data_files']) > 0
             assert all(Path(p).is_file() for p in bundle['figure_paths'].values())
+            pd.testing.assert_frame_equal(summary, original_summary, check_exact=True)
+            change_files = [
+                Path(bundle['output_dir']) / '图形数据_GraphPad' / 'SMOKE' / name
+                for name in ['Fig09_NMD_baseline_change_bars.csv',
+                             'Fig10_Entropy_baseline_change_bars.csv']
+            ]
+            for change_file in change_files:
+                changes = pd.read_csv(change_file)
+                baseline_rows = changes.loc[changes['Week'] == 0]
+                assert len(baseline_rows) == 2
+                assert (baseline_rows['Change_from_baseline'] == 0).all()
+                assert (baseline_rows['Baseline_week'] == 0).all()
             with zipfile.ZipFile(bundle['zip_path']) as z:
                 assert z.testzip() is None
                 assert any('NMD方法敏感性' in name for name in z.namelist())
@@ -72,6 +85,11 @@ def run_self_test(report_path: str) -> int:
                           environment=audit['environment'],
                           nmd_mean=summary['NMD_mean'].tolist(),
                           diagonal_mean=summary['NMD_diagonal_capped_mean'].tolist())
+            report.update(entropy=summary['Entropy'].tolist(),
+                          baseline_change_files=len(change_files),
+                          baseline_starts_equal_zero=True,
+                          output_preserves_summary=True,
+                          display_revision=audit.get('code', {}).get('build_info', {}).get('display_revision'))
             cleanup_generated_bundle(bundle)
         status = 0
     except Exception:

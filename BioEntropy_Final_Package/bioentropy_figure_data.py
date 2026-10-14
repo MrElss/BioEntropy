@@ -5,14 +5,14 @@ point, and the delta / p-value / significance annotations printed on the figure.
 Values come from the same helpers the plotting code calls, so a table cannot
 drift from its figure.
 
-The bar is not always the mean of the dots, so every ``*_bars.csv`` carries
+The bar is not always the mean of the dots, so tables with overlaid points carry
 ``Mean_of_plotted_points`` and a ``Bar_equals_mean_of_points`` flag. For raw
 disease deviation (Fig 01) the bar is the mean of its dots. For the normalized
 figures (Fig 02/04/05/08) the bar is normalize(group mean) while the dots are
 normalize(subject value); the 0-100 transform applies a gamma exponent and is
-therefore non-linear, so the two differ. For entropy (Fig 03) the bar is a
-group-level covariance quantity and the dots are per-subject reference-state
-contributions.
+therefore non-linear, so the two can differ despite sharing fitted anchors.
+Entropy is a group-level quantity and is exported without individual dots.
+Longitudinal figures 09/10 show each group's raw change from its own baseline.
 
 Also writes 图表-数据对照表.md/.csv mapping each visual element to the file and
 column holding its number, with the formula used to derive it.
@@ -83,8 +83,13 @@ def _points_prism(points: Dict[tuple, np.ndarray], multi_week: bool) -> pd.DataF
 def _collect_points(sample_level: pd.DataFrame, experiment: str, base: str,
                     groups: List[str], weeks: List[int], multi_week: bool,
                     entropy_contribution: bool = False,
-                    normalize: Optional[str] = None) -> Dict[tuple, np.ndarray]:
+                    normalize: Optional[str] = None,
+                    reference_summary: Optional[pd.DataFrame] = None) -> Dict[tuple, np.ndarray]:
     """Per-subject plotted values keyed by (group, week), mirroring the overlays."""
+    # Neither covariance entropy nor state entropy is an individual ln(NMD)
+    # value. The entropy figures therefore have no individual point dataset.
+    if entropy_contribution or base == "Entropy":
+        return {}
     if not isinstance(sample_level, pd.DataFrame) or sample_level.empty:
         return {}
     sub = sample_level
@@ -92,36 +97,28 @@ def _collect_points(sample_level: pd.DataFrame, experiment: str, base: str,
         sub = sub[sub["Experiment"].astype(str) == str(experiment)]
     if sub.empty or "Group" not in sub.columns:
         return {}
-    src = "NMD" if entropy_contribution else base
+    src = base
     if src not in sub.columns:
         return {}
     wk = pd.to_numeric(sub.get("Week"), errors="coerce") if "Week" in sub.columns else None
 
     cells: Dict[tuple, np.ndarray] = {}
     flat_vals: List[float] = []
-    flat_grp: List[str] = []
     for group in groups:
         gmask = sub["Group"].astype(str) == str(group)
         for w in (weeks if multi_week else [weeks[0] if weeks else 0]):
             mask = gmask if (wk is None or not multi_week) else (gmask & (wk == int(w)))
             v = pd.to_numeric(sub.loc[mask, src], errors="coerce").to_numpy(dtype=float)
             v = v[np.isfinite(v)]
-            if entropy_contribution:
-                v = v[v > 0]
-                if v.size:
-                    v = 0.5 * np.log(2 * np.pi * np.e * v * v)
             if v.size == 0:
                 continue
             cells[(str(group), int(w))] = v
             flat_vals.extend(float(x) for x in v)
-            flat_grp.extend([str(group)] * v.size)
 
     if normalize and cells:
-        series, grp = pd.Series(flat_vals, dtype=float), pd.Series(flat_grp)
-        if normalize == "linear":
-            norm = _plots._normalize_anchor_linear_0_100(series, grp).to_numpy(dtype=float)
-        else:
-            norm = _plots._normalize_display_window(series, grp).to_numpy(dtype=float)
+        norm = _plots._normalize_values_for_metric(
+            pd.Series(flat_vals, dtype=float), base, reference_summary,
+            normalize=normalize).to_numpy(dtype=float)
         i = 0
         for key in list(cells):
             n = cells[key].size
@@ -297,7 +294,8 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
 
         # ================= Figure 02 : normalized deviation ================= #
         burden_pts_disp = _collect_points(sample_level, exp, base, groups, weeks,
-                                          multi_week, normalize="display")
+                                          multi_week, normalize="display",
+                                          reference_summary=sub)
         s2 = f"Fig02_{short}_normalized"
         _emit(exp_dir, s2,
               bar_frame({f"{short}_raw": sub[bcol],
@@ -307,9 +305,9 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
               bar_value_col="Display_plotted_0_100_gamma3")
         _map(exp, "图02", "柱高/折线点（归一化显示值）", f"{s2}_bars.csv",
              "Display_plotted_0_100_gamma3",
-             "先线性锚定 Normal=0、model=100，再施加 gamma=3 显示增强")
+             "以本实验全部组汇总值拟合 Normal/model 锚点；不可用时用组汇总值范围；截断至0–100后施加 gamma=3")
         _map(exp, "图02", "散点", f"{s2}_points.csv / _prism.csv", "Value",
-             "对每个样本值施加与柱相同的归一化变换（注意：非线性，故散点均值≠柱高）")
+             "使用与组折线/柱相同的锚点、截断及gamma变换；不再按个体范围重新缩放。非线性时散点均值可不同于柱高")
 
         # ================= Figure 03 : raw entropy ========================== #
         ent_pts = _collect_points(sample_level, exp, base, groups, weeks, multi_week,
@@ -325,11 +323,9 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
         _emit(exp_dir, s3, bar_frame(f3), ent_pts, multi_week, written,
               bar_value_col="Entropy_plotted")
         _map(exp, "图03", "柱高/折线点（系统熵）", f"{s3}_bars.csv", "Entropy_plotted",
-             "组内多指标分布的对数行列式熵 H=½·log[(2πe)^p·|Σ|]，Σ 为 Ledoit–Wolf 收缩估计")
+             "原样读取汇总表Entropy；Entropy_method标识所用状态熵或协方差熵方法，不以个体ln(NMD)代替")
         _map(exp, "图03", "误差棒", f"{s3}_bars.csv", "Entropy_CI_low / Entropy_CI_high",
              "自助法 200 次重抽样、seed=42 的 95% CI")
-        _map(exp, "图03", "散点", f"{s3}_points.csv / _prism.csv", "Value",
-             "每个样本的参考态熵贡献 0.5·ln(2πe·NMD²)（与柱是不同的量）")
         ann3 = _annotation_frame(comparisons, weeks,
                                  ["Entropy_diff_treat_minus_comp", "Entropy_diff"],
                                  ["Entropy_p_boot", "Entropy_p_mannwhitney"])
@@ -352,47 +348,54 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
               bar_value_col="Display_plotted_0_100_gamma3")
         _map(exp, "图04", "柱高/折线点（熵归一化显示值）", f"{s4}_bars.csv",
              "Display_plotted_0_100_gamma3", "同图02，对熵做线性锚定 + gamma=3")
-        _map(exp, "图04", "散点", f"{s4}_points.csv / _prism.csv", "Value",
-             "对每个样本的熵贡献施加同一归一化变换")
 
         # ================= Figure 05 : grouped bar ========================== #
+        joint_sub = sub.dropna(subset=[bcol, "Entropy"])
+        joint_groups = [g for g in groups if g in set(joint_sub["Group"])]
+        joint_bar_frame = partial(_bar_frame, joint_sub, multi_week, joint_groups)
+        joint_b_gamma = _plots._normalize_display_window(joint_sub[bcol], joint_sub["Group"])
+        joint_e_gamma = _plots._normalize_display_window(joint_sub["Entropy"], joint_sub["Group"])
+        # Longitudinal grouped-bar panels do not draw individual points.
+        joint_pts = (_collect_points(sample_level, exp, base, joint_groups, sorted(joint_sub["Week"].unique()),
+                                     multi_week, normalize="display", reference_summary=joint_sub)
+                     if joint_sub["Week"].nunique() == 1 else {})
         s5 = f"Fig05_{short}_Entropy_grouped_bar"
         _emit(exp_dir, s5,
-              bar_frame({f"{short}_raw_label": sub[bcol],
-                          f"{short}_bar_height_0_100": disp_b_gamma,
-                          "Entropy_raw_label": sub["Entropy"],
-                          "Entropy_bar_height_0_100": disp_e_gamma}),
+              joint_bar_frame({f"{short}_raw_label": joint_sub[bcol],
+                                f"{short}_bar_height_0_100": joint_b_gamma,
+                                "Entropy_raw_label": joint_sub["Entropy"],
+                                "Entropy_bar_height_0_100": joint_e_gamma}),
               {}, multi_week, written)
-        _emit(exp_dir, f"{s5}_{short}Dots", None, burden_pts_disp, multi_week, written)
-        _emit(exp_dir, f"{s5}_EntropyDots", None, ent_pts_disp, multi_week, written)
+        _emit(exp_dir, f"{s5}_{short}Dots", None, joint_pts, multi_week, written)
         _map(exp, "图05", f"左柱高（{short}）", f"{s5}_bars.csv",
-             f"{short}_bar_height_0_100", "归一化显示值（与图02柱高相同）")
+             f"{short}_bar_height_0_100", "有效联合汇总行中的负担归一化显示值；完整数据时与图02相同")
         _map(exp, "图05", "右柱高（Entropy）", f"{s5}_bars.csv",
-             "Entropy_bar_height_0_100", "归一化显示值（与图04柱高相同）")
+             "Entropy_bar_height_0_100", "有效联合汇总行中的熵归一化显示值；完整数据时与图04相同")
         _map(exp, "图05", "柱上标注的数字", f"{s5}_bars.csv",
              f"{short}_raw_label / Entropy_raw_label", "对应的原始值（非柱高）")
-        _map(exp, "图05", f"左柱散点（{short}）", f"{s5}_{short}Dots_prism.csv", "各组一列",
-             "与图02散点相同")
-        _map(exp, "图05", "右柱散点（Entropy）", f"{s5}_EntropyDots_prism.csv", "各组一列",
-             "与图04散点相同")
+        if joint_pts:
+            _map(exp, "图05", f"左柱散点（{short}）", f"{s5}_{short}Dots_prism.csv", "各组一列",
+                 "仅单时间点图显示；使用与本图柱相同的有效联合汇总行拟合锚点")
 
         if not multi_week:
             # ============ Figures 07 / 08 : state plots (single week) ======= #
-            order = sub.groupby("Group")[bcol].mean().sort_values().index.tolist()
+            order = joint_sub.groupby("Group")[bcol].mean().sort_values().index.tolist()
             rank = {g: i + 1 for i, g in enumerate(order)}
+            state_pts = _collect_points(sample_level, exp, base, order, weeks, multi_week)
             s7 = f"Fig07_{short}_Entropy_state_raw"
             _emit(exp_dir, s7,
-                  bar_frame({"Plot_order_x": sub["Group"].map(rank),
-                              f"y_{short}_raw": sub[bcol],
-                              "Entropy_reference_only": sub["Entropy"]}, order=order),
-                  burden_pts, multi_week, written, bar_value_col=f"y_{short}_raw")
+                  joint_bar_frame({"Plot_order_x": joint_sub["Group"].map(rank),
+                                    f"y_{short}_raw": joint_sub[bcol],
+                                    "Entropy_reference_only": joint_sub["Entropy"]}, order=order),
+                  state_pts, multi_week, written, bar_value_col=f"y_{short}_raw")
             s8 = f"Fig08_{short}_Entropy_state_normalized"
             _emit(exp_dir, s8,
-                  bar_frame({"Plot_order_x": sub["Group"].map(rank),
-                              f"y_{short}_linear_0_100": disp_b_lin,
-                              "Entropy_reference_only": sub["Entropy"]}, order=order),
-                  _collect_points(sample_level, exp, base, groups, weeks, multi_week,
-                                  normalize="linear"),
+                  joint_bar_frame({"Plot_order_x": joint_sub["Group"].map(rank),
+                                    f"y_{short}_linear_0_100": _plots._normalize_anchor_linear_0_100(
+                                        joint_sub[bcol], joint_sub["Group"]),
+                                    "Entropy_reference_only": joint_sub["Entropy"]}, order=order),
+                  _collect_points(sample_level, exp, base, order, weeks, multi_week,
+                                  normalize="linear", reference_summary=joint_sub),
                   multi_week, written, bar_value_col=f"y_{short}_linear_0_100")
             for s, ycol, note in ((s7, f"y_{short}_raw", "原始值"),
                                   (s8, f"y_{short}_linear_0_100", "线性锚定 0–100（无 gamma）")):
@@ -422,6 +425,28 @@ def export_figure_data_tables(results: Dict[str, Any], output_dir: Path) -> List
                 written.append(f"{s8}_annotations.csv")
                 _map(exp, "图08", "每周面板上方的显著性星号", f"{s8}_annotations.csv",
                      "Significance_label / p_value", "来自 03_治疗比较.xlsx 的每周 p 值")
+
+            # ===== Figures 09 / 10 : within-group raw baseline change ====== #
+            for figure_no, metric, metric_name in (("09", bcol, short),
+                                                   ("10", "Entropy", "Entropy")):
+                changes = _plots._baseline_change_table(sub, metric)
+                if not changes["Change_from_baseline"].notna().any():
+                    continue
+                stem = f"Fig{figure_no}_{metric_name}_baseline_change"
+                cols = {f"{metric_name}_raw": changes[metric]}
+                for col in ("Baseline_week", "Baseline_value", "Baseline_reference",
+                            "Change_from_baseline"):
+                    cols[col] = changes[col]
+                if metric == "Entropy" and "Entropy_method" in changes.columns:
+                    cols["Entropy_method"] = changes["Entropy_method"]
+                _emit(exp_dir, stem, bar_frame(cols), {}, multi_week, written)
+                _map(exp, f"图{figure_no}", "折线点（相对本组基线的变化）",
+                     f"{stem}_bars.csv", "Change_from_baseline",
+                     "原始组值减去本组0W值；缺少0W时采用本组最早可用周，Baseline_reference明示；不足两周不连变化线")
+                _map(exp, f"图{figure_no}", "原值和基线来源",
+                     f"{stem}_bars.csv",
+                     f"{metric_name}_raw / Baseline_week / Baseline_value / Baseline_reference",
+                     "使用原始尺度，未做0–100缩放、gamma或基线显著性检验；原始结果及已有组间统计不变")
 
         # ================= mechanism drivers ================================ #
         mech = exp_res.get("feature_mechanism", pd.DataFrame())
@@ -490,18 +515,19 @@ def _readme_text(manifest: List[Dict[str, Any]]) -> str:
     a("")
     a("本文件夹给出主图中**实际绘制的每一个数值**。逐元素的对照见 `图表-数据对照表.md`。")
     a("")
-    a("## ⚠ 最重要的一点：柱高 ≠ 散点均值（除图 01 外）")
+    a("## 组值与散点的关系")
     a("")
-    a("每个 `*_bars.csv` 都带有 `Mean_of_plotted_points` 与 `Bar_equals_mean_of_points` 两列：")
+    a("同时显示组值和散点的 `*_bars.csv` 带有 `Mean_of_plotted_points` 与 `Bar_equals_mean_of_points` 两列：")
     a("")
     a("| 图 | 柱高 = 散点均值？ | 原因 |")
     a("|---|---|---|")
-    a("| 图 01（原始 NMD/NRBS） | **YES** | 柱＝各组均值，点＝各样本值 |")
-    a("| 图 02 / 04 / 05 | **NO** | 柱＝normalize(组均值)，点＝normalize(样本值)；gamma=3 非线性 |")
-    a("| 图 03（熵） | **NO** | 柱＝组水平协方差熵；点＝样本参考态熵贡献，二者不同量 |")
-    a("| 图 08（状态图） | **NO** | 同上，y 为线性锚定 0–100 |")
+    a("| 图 01（原始 NMD/BRI/NRBS） | **YES** | 柱＝各组均值，点＝各样本值 |")
+    a("| 图 02 / 05（负担） | 不一定 | 组值和散点共享组汇总值确定的锚点，但截断和gamma=3会使均值关系改变 |")
+    a("| 图 03 / 04 / 05（熵） | 不适用 | 仅显示组Entropy；不把个体ln(NMD)贡献作为同一熵指标的散点 |")
+    a("| 图 08（单时间点状态图） | 不一定 | 组值和散点使用相同线性锚点，但0–100截断可能改变均值关系 |")
+    a("| 图 09 / 10（多时间点基线变化） | 不适用 | 原始组值减本组基线；不输出个体配对变化散点 |")
     a("")
-    a("**因此：把散点粘进 Prism 后，不要让 Prism 自动算均值当柱高**（图 01 除外）；")
+    a("**把归一化散点粘进 Prism 后，不要让 Prism 自动算均值当柱高**；")
     a("请把 `*_bars.csv` 中的柱高作为**独立的一组数据**输入。")
     a("")
     a("## 文件类型")
@@ -517,9 +543,18 @@ def _readme_text(manifest: List[Dict[str, Any]]) -> str:
     a("")
     a("- **图 01**：Column 表粘贴 `_prism.csv`，选 *Scatter dot plot with mean*；")
     a("  误差棒用 `_bars.csv` 的 CI 列（自助法 200 次、seed=42），不要用 Prism 自算的 SD/SEM。")
-    a("- **图 02/03/04**：柱高单独输入（`_bars.csv`），散点作为第二数据集叠加。")
-    a("- **图 05**：两组柱高 + 两套散点（`*Dots_prism.csv`）。")
+    a("- **图 02**：组值单独输入（`_bars.csv`），散点作为第二数据集叠加。")
+    a("- **图 03/04**：只输入组Entropy（`_bars.csv`），不叠加个体ln(NMD)点。")
+    a("- **图 05**：两组柱高；仅单时间点图的负担指标叠加 `*Dots_prism.csv` 中的散点。")
     a("- **图 07/08（单时间点）**：XY 图，x=`Plot_order_x`，y=`y_*`，平滑连线；散点另加。")
+    a("- **图 09/10（多时间点）**：XY 图，x=`Week`，y=`Change_from_baseline`；分别绘制各组，标明基线来源。")
+    a("")
+    a("## 基线变化图的解释")
+    a("")
+    a("各组均有有效0W值时，图09/10的0W折线点均为0。缺少0W时，采用该组最早可用时间点，")
+    a("其时间和来源写入 `Baseline_week` / `Baseline_reference`，不得将该起点称作0W。")
+    a("仅有一个有效时间点的组不生成变化线。变化值是组汇总量的相减，不是同一受试者的配对变化估计；")
+    a("这些图不额外生成置信区间或p值。原始计算结果和已有组间检验保持不变。")
     a("")
     a("## 本次导出的实验")
     a("")

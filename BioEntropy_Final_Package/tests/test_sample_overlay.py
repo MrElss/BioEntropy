@@ -1,8 +1,8 @@
 """Tests for the per-subject point overlay on single-timepoint group bars.
 
-The bars are unchanged; the overlay reads the render-pass sample-level frame from
-display state and maps each metric to its per-subject values (NMD/NRBS/BRI
-directly; Entropy via the reference-state contribution 0.5·ln(2πe·NMD²)).
+The overlay reads both the sample and group-summary frames from display state.
+NMD/NRBS/BRI use their own per-subject values and the fitted group-summary
+anchors. Group-level Entropy is not replaced with individual ln(NMD) values.
 """
 import numpy as np
 import pandas as pd
@@ -28,11 +28,17 @@ def sample_level():
 
 def _with_state(sl, fn):
     prev = getattr(_dstate, "CURRENT_SAMPLE_LEVEL", None)
+    prev_summary = getattr(_dstate, "CURRENT_SUMMARY", None)
     _dstate.CURRENT_SAMPLE_LEVEL = sl
+    keys = [c for c in ("Experiment", "Group", "Week") if c in sl.columns]
+    metrics = [c for c in ("NMD", "NRBS", "BRI") if c in sl.columns]
+    _dstate.CURRENT_SUMMARY = sl.groupby(keys, as_index=False)[metrics].mean().rename(
+        columns={c: f"{c}_mean" for c in metrics})
     try:
         return fn()
     finally:
         _dstate.CURRENT_SAMPLE_LEVEL = prev
+        _dstate.CURRENT_SUMMARY = prev_summary
 
 
 def test_nmd_maps_to_raw_per_sample(sample_level):
@@ -42,13 +48,13 @@ def test_nmd_maps_to_raw_per_sample(sample_level):
     assert sorted(pts["Model"].tolist()) == [10.0, 12.0]
 
 
-def test_entropy_uses_reference_state_contribution(sample_level):
+@pytest.mark.parametrize("method", ["normal_reference_state_entropy", "covariance_entropy"])
+def test_group_entropy_has_no_individual_log_distance_points(sample_level, method):
+    # Both entropy methods are group quantities, not mean ln(NMD).
+    sample_level = sample_level.assign(Entropy_method=method)
     pts = _with_state(sample_level, lambda: _per_sample_points_for_metric(
         "E1", "Entropy", ["Normal", "Model"]))
-    # 0.5·ln(2πe·NMD²) is monotone increasing in NMD, so Model dots sit above Normal
-    assert float(np.mean(pts["Model"])) > float(np.mean(pts["Normal"]))
-    expected = 0.5 * np.log(2 * np.pi * np.e * 10.0 ** 2)
-    assert abs(float(pts["Model"][0]) - expected) < 1e-9
+    assert pts == {}
 
 
 def test_no_state_means_no_points(sample_level):

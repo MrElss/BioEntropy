@@ -1,23 +1,57 @@
-# BioEntropy V1.0
+# BioEntropy V1.0 — display correction
 
-## Downloads
+The application remains **BioEntropy V1.0**. Release **v1.0.1** and Windows file
+version **1.0.1.0** identify this corrected build.
 
-- **BioEntropy_V1.0_Windows.zip**: unpack and run `BioEntropy_V1_0.exe` on Windows x64. Includes input templates, methods and Chinese/English supplementary methods.
-- **BioEntropy_V1.0_Source.zip**: source, tests, build scripts, templates and documentation. Python 3.11 or newer is required.
-- **BioEntropy_V1.0_SI_CN.docx / BioEntropy_V1.0_SI_EN.docx**: editable supplementary methods; each contains 7 pages and 12 editable equations.
-- **BioEntropy_V1.0_SHA256.txt**: SHA-256 checksums for the four download files and the Windows executable.
+## What changed
 
-## Release contents
+- Longitudinal outputs now include **Figure 09: disease-deviation change** and
+  **Figure 10: Entropy change**. Each group subtracts its own 0W estimate, so the
+  baseline markers coincide at zero. If 0W is unavailable, the earliest valid
+  visit is used and recorded. Groups with fewer than two valid visits do not
+  define a change trajectory. Single-timepoint outputs remain group comparisons.
+- Individual disease-deviation points now use the same group-summary reference
+  anchors as the corresponding curves or bars. The original normalized group
+  values are preserved. Clipping and gamma=3 mean a transformed group value
+  still need not equal the mean of the transformed individual points.
+- Entropy figures show group estimates and applicable existing intervals;
+  individual log-distance dots are no longer overlaid as entropy observations.
+- Figure-data CSV files follow the actual displayed values and include the
+  baseline week, baseline value and change. Files for unplotted point layers
+  are no longer generated. New baseline-figure labels remain readable at crossings.
+- Chinese and English supplementary methods, input guidance and release metadata
+  describe the corrected display rules.
 
-- Unified V1.0 application, executable, output-folder and build metadata.
-- Full-covariance normal-reference distance, separate diagonal sensitivity distance, covariance entropy and distance-derived state scores.
-- Advisory outlier detection without subject-level attenuation or exclusion; documented preprocessing and imputation still apply.
-- Forest-module report wording aligned with modified Hartung-Knapp uncertainty intervals and endpoint classification.
-- Bilingual supplementary methods distinguish the main workflow from the separate forest module, including their limitations and reproducibility requirements.
-- Public source and archives contain templates and synthetic fixtures; research data and study results are excluded.
+## What did not change
+
+The NMD, covariance entropy, reference-state score, NRBS/BRI, outlier/QC,
+bootstrap and forest-module calculations are unchanged. Raw numerical tables,
+existing statistical results and original normalized group curves are preserved.
+The new baseline figures describe changes in group summaries; they do not add a
+paired-subject analysis, a new uncertainty interval or a baseline-adjusted
+treatment-effect estimate. The original absolute-value plots remain available.
 
 ## Validation
 
-The local Windows/Python 3.12 suite passed **138 tests**, with **7 optional external-data tests skipped**. Two existing Matplotlib layout warnings occurred in figure-export tests; those tests passed. Static checks passed. The source and packaged Windows executable both passed the synthetic end-to-end self-test (32 samples, 4 groups, 8 figures, 27 figure-data files), with exactly equal reference-distance summaries. Core numerical logic and the public numeric fixture were verified against the validated calculation baseline; changes to the forest module are limited to reporting and figure descriptions. The Windows file and product versions are 1.0.0.0.
+- **155 tests passed; 7 optional external-data tests skipped.** Static checks passed.
+  Two existing Matplotlib layout warnings occurred in unrelated figure-export tests.
+- Numerical fixtures are unchanged, and the public regression suite checks the
+  full result tables against those fixtures. Computational modules were also
+  compared with the preceding release.
+- Source and Windows executable end-to-end self-tests passed: 32 synthetic
+  sample records, 4 group/visit summaries, 10 figures and 21 figure-data files.
+  Raw distance and entropy summaries agree between source and executable.
+- Existing longitudinal study tables were checked locally: baseline changes
+  begin at zero, normalized points use the group-curve anchors, original group
+  values match and the study files remain untouched. Those data are not distributed.
+- Bilingual Word documents were checked for method consistency and page layout.
 
-The supplementary methods describe software implementation. Manuscripts must additionally specify the study's actual data, marker panels, reference groups, settings and comparisons. Software validation does not establish cross-model biological comparability.
+## Downloads
+
+- **BioEntropy_V1.0_Windows.zip** — extract and run `BioEntropy_V1_0.exe` on Windows x64.
+- **BioEntropy_V1.0_Source.zip** — source, tests, templates and documentation.
+- **BioEntropy_V1.0_SI_CN.docx / BioEntropy_V1.0_SI_EN.docx** — editable supplementary methods.
+- **BioEntropy_V1.0_SHA256.txt** — checksums for the downloads and executable.
+
+For overlapping 0W starting points, open **main figure 09 or 10**. The original
+absolute-value and normalized figures retain observed baseline differences.

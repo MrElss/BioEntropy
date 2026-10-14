@@ -40,7 +40,9 @@ def build_markdown_report(results: Dict[str, Any]) -> str:
         "## NMD × Entropy 联合展示建议",
         "- 对临床纵向实验，多时间点图继续以 Week 为横坐标。",
         "- 对动物实验或其他单时间点实验，软件会自动改用 **给药组/处理组** 作为横坐标，不再把 0W 当作真实时间维度解释。",
-        "- 输出图按 9 个主图/主文件排列：马氏距离/疾病偏离度真实值、马氏距离/疾病偏离度归一化值、熵真实值、熵归一化值、NMD/BRI–Entropy 二维柱形图、可旋转 3D HTML、真实值 NMD/BRI–Entropy 可点击走势点图、归一化 NMD/BRI–Entropy 可点击走势点图、药物机制图。",
+        "- 多时间点实验通常输出 10 个主图/文件，单时间点实验通常输出 9 个；原始值、归一化展示、联合展示、状态图和机制图均保留。",
+        "- 多时间点新增 Fig09 疾病偏离度、Fig10 熵的基线变化图：各组减去自身 0W 值，缺失 0W 时使用最早有效周并注明。采用原始单位，不使用 gamma 或百分比，不表示个体配对变化或其置信区间。",
+        "- 疾病偏离度个体散点和组曲线使用同一份组汇总数据确定缩放锚点；截断及非线性变换后，组曲线不必等于散点的平均值。熵仅展示组估计，不叠加个体对数距离。",
         f"- 归一化展示同时覆盖 NMD/BRI 和 Entropy：结果表保留线性锚定值（Normal=0、model=100）与 gamma={DISPLAY_CONTRAST_GAMMA:g} 治疗窗口增强展示值；正式判断仍回到原始值、线性锚定值、置信区间和统计检验。",
         "- 桌面端会自动检测每个实验的组别，并在界面中生成可拖拽排序列表；拖拽后的顺序只影响图和展示表的排列，不改变计算结果。",
     ]
@@ -99,7 +101,9 @@ def build_input_guide_html(out_path: Path) -> Path:
         "第一张主图的负担指标优先级为 NMD > NRBS > BRI；只有存在真实 Normal 参考时才解释为 True-Normal NMD。",
     ).replace(
         new_figures,
-        "<li><code>figures</code> 根据实验类型保留主图：多时间点通常为 8 个，单时间点通常为 9 个；包含原值、归一化展示、联合展示、3D HTML、状态图和机制驱动图。</li>",
+        "<li><code>figures</code> 根据实验类型保留主图：多时间点通常为 10 个，单时间点通常为 9 个；包含原值、归一化展示、联合展示、3D HTML、状态图和机制驱动图。"
+        "多时间点的 Fig09/10 展示各组相对自身 0W 的疾病偏离度/熵变化；缺失 0W 时使用最早有效周并注明。图中使用原始单位，不进行 gamma 或百分比变换，也不表示个体配对变化的推断。</li>"
+        "<li>疾病偏离度散点与组值共用组汇总数据的归一化锚点，展示值截断到 0–100。截断与 gamma 变换后，曲线不必等于散点均值，0/100 也不代表生物学极限。熵图仅显示组估计。</li>",
     )
     text = text.replace("</body></html>", (
         "<h2>8. 运行记录与质量提示</h2>"
@@ -175,12 +179,15 @@ def _append_joint_visual_artifacts(results: Dict[str, Any], bundle: Dict[str, An
     for exp, exp_res in results.get("experiments", {}).items():
         previous_display_experiment = _dstate.CURRENT_DISPLAY_EXPERIMENT
         previous_sample_level = getattr(_dstate, "CURRENT_SAMPLE_LEVEL", None)
+        previous_summary = _dstate.CURRENT_SUMMARY
         _dstate.CURRENT_DISPLAY_EXPERIMENT = str(exp)
         _dstate.CURRENT_SAMPLE_LEVEL = exp_res.get("sample_level")
         summary_df = exp_res.get("summary", pd.DataFrame())
+        _dstate.CURRENT_SUMMARY = summary_df
         if not isinstance(summary_df, pd.DataFrame) or summary_df.empty:
             _dstate.CURRENT_DISPLAY_EXPERIMENT = previous_display_experiment
             _dstate.CURRENT_SAMPLE_LEVEL = previous_sample_level
+            _dstate.CURRENT_SUMMARY = previous_summary
             continue
 
         try:
@@ -189,9 +196,8 @@ def _append_joint_visual_artifacts(results: Dict[str, Any], bundle: Dict[str, An
             comparison_df = exp_res.get("comparisons", exp_res.get("comparison", pd.DataFrame()))
             burden_kind = _preferred_burden_kind(exp_res)
             meta = _burden_metadata(burden_kind)
-            # Multi-week (clinical) experiments use the state-space phase portrait
-            # (main 10/11) instead of the clickable time-series maps (main 07/08);
-            # single-timepoint (animal) experiments keep the clickable state map.
+            # Multi-week experiments have baseline-change figures; a single
+            # uploaded time point does not imply a longitudinal baseline.
             try:
                 multi_week = int(pd.to_numeric(summary_df.get("Week"), errors="coerce").nunique()) > 1
             except Exception:
@@ -290,9 +296,24 @@ def _append_joint_visual_artifacts(results: Dict[str, Any], bundle: Dict[str, An
             if psmall.exists():
                 figure_paths[f"{exp}_main_08_{meta['prefix']}_entropy_weekly_state_panels"] = str(psmall)
                 keep_main_files.append(psmall)
+
+            if multi_week:
+                pchange = figures_dir / f"{exp}_main_09_{meta['prefix']}_baseline_change.png"
+                plot_burden_baseline_aligned(summary_df, exp, pchange, burden_kind=burden_kind,
+                                             treatment_group=treatment_group, comparator_group=comparator_group)
+                if pchange.exists():
+                    figure_paths[f"{exp}_main_09_{meta['prefix']}_baseline_change"] = str(pchange)
+                    keep_main_files.append(pchange)
+                pechange = figures_dir / f"{exp}_main_10_entropy_baseline_change.png"
+                plot_entropy_baseline_aligned(summary_df, exp, pechange,
+                                              treatment_group=treatment_group, comparator_group=comparator_group)
+                if pechange.exists():
+                    figure_paths[f"{exp}_main_10_entropy_baseline_change"] = str(pechange)
+                    keep_main_files.append(pechange)
         finally:
             _dstate.CURRENT_DISPLAY_EXPERIMENT = previous_display_experiment
             _dstate.CURRENT_SAMPLE_LEVEL = previous_sample_level
+            _dstate.CURRENT_SUMMARY = previous_summary
 
     _delete_unselected_figure_files(figures_dir, keep_main_files)
     bundle["figure_paths"] = figure_paths

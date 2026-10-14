@@ -1,27 +1,34 @@
 {
   "product": "BioEntropy",
   "version": "V1.0",
-  "release_tag": "v1.0.0",
+  "release_tag": "v1.0.1",
   "release_date": "2026-10-13",
-  "windows_file_version": "1.0.0.0",
+  "windows_file_version": "1.0.1.0",
   "executable": {
     "name": "BioEntropy_V1_0.exe",
-    "bytes": 146223803,
-    "sha256": "3aebb6616104e391b8f2ffd0c5bc248aa0c027c5805b0e0f3b7dd9f05eee5ad0"
+    "bytes": 146232260,
+    "sha256": "49b81daa45e18d85de0d3fe435623db799dff847d046024bac33df60dd491221"
   },
   "validation": {
-    "tests_passed": 138,
+    "tests_passed": 155,
     "external_data_tests_skipped": 7,
     "existing_plot_layout_warnings": 2,
     "static_checks": "passed",
     "source_self_test": "passed",
     "windows_self_test": "passed",
     "source_windows_distance_summaries_equal": true,
+    "source_windows_entropy_summaries_equal": true,
+    "output_preserves_summary": true,
+    "embedded_sources_match_checkout": true,
+    "bilingual_si_pages": 8,
+    "bilingual_si_editable_equations": 13,
     "reference_numeric_equivalence": "passed",
+    "baseline_starts_equal_zero": true,
+    "same_anchors_for_points_and_group_curves": true,
     "synthetic_samples": 32,
     "synthetic_groups": 4,
-    "figures": 8,
-    "figure_data_files": 27
+    "figures": 10,
+    "figure_data_files": 21
   },
   "method_policy": {
     "primary_nmd": "ledoitwolf_full_covariance",
@@ -48,15 +55,15 @@
   "source_sha256": {
     "BioEntropy_Final_Package/bioentropy_audit.py": "449488431a0c089b39c659802e87c7b7ca6862df77dab37fba2eb2ebf0d10db0",
     "BioEntropy_Final_Package/bioentropy_constants.py": "74e29c7e7601b6bdb930b907b608793d9962cb9ce4e4d867ed7e6582dda74ae2",
-    "BioEntropy_Final_Package/bioentropy_core_generalized.py": "07ab7718261890f2365d7612c04f0d7318d0bb220fda3a195bbffc166ecfefee",
+    "BioEntropy_Final_Package/bioentropy_core_generalized.py": "c63649919d5d91a2250348130b9e6f145788e9ec10274b82635de1f83cf87ea8",
     "BioEntropy_Final_Package/bioentropy_core_legacy.py": "d52b25d48cdf2e4d9a64f8d40649375d651fee96e2fb16723fece9c5f7ca30ed",
     "BioEntropy_Final_Package/BioEntropy_Desktop.spec": "713a8b407c7a288ba305d4cedb5130e3f2608294f3e4820cfb87d173325c6682",
-    "BioEntropy_Final_Package/BioEntropy_Desktop_App.py": "f621a71bb52e361834dc798d5d46e08b4ec945552f7ac18bb5092aed5dded649",
-    "BioEntropy_Final_Package/bioentropy_display_state.py": "60a3c0d72ac8613932e362cc48dcb80c5e4b41c4c30c394988381b5b490d3df3",
+    "BioEntropy_Final_Package/BioEntropy_Desktop_App.py": "7357e291a56d0460f6c017403d23c8dc7792bb84bead8e5d0e1fd0694dea1d7f",
+    "BioEntropy_Final_Package/bioentropy_display_state.py": "f31e957cbe6bdc111ad0db239a8d536c9e0aaa84defd9b9cfe7dac1b82df97ff",
     "BioEntropy_Final_Package/bioentropy_entropy.py": "99e09e10b69bc12e79bdae99e667bc86c7b6f9e4fdfd7c6c2a204681153d2e67",
-    "BioEntropy_Final_Package/bioentropy_figure_data.py": "b739598aeee67bdf6ded6c04a2e6c994af2be0f13ff734914b904b20dc3b049d",
-    "BioEntropy_Final_Package/bioentropy_plots.py": "267ac04825b7401825d938f9aa8d83f4afec73103e8f75105eab882e24f987be",
-    "BioEntropy_Final_Package/bioentropy_selftest.py": "cb2b0fc74f6d88d7494c37c59dfed53183ef9bae8ff516f45495cc490883b13b",
+    "BioEntropy_Final_Package/bioentropy_figure_data.py": "84d80595990076145f41a12caea058dca650ccc103c820844f6cabda0237a7e6",
+    "BioEntropy_Final_Package/bioentropy_plots.py": "f9e7c4aa2136df5181cb0faadb10c241e777d704ece80be33db185a7f1062235",
+    "BioEntropy_Final_Package/bioentropy_selftest.py": "4bfc4aec62d1e1865a7338111cd7688ce5100480b6b9397528d70d94b7d7d366",
     "BioEntropy_Final_Package/bootstrap_build.py": "b9d319fecdb8fe91c09e0a91a7581ad06fdd41934b3f5cf4c6641318ab994bca",
     "BioEntropy_Final_Package/bootstrap_run.py": "4cb0cba908a14f1ac5d7bceb097c49abf8ff7441893a67707949d80a98e49979",
     "BioEntropy_Final_Package/gvalue_recompute.py": "d2cee81a8290b5ad0ca019136fa122ac9e061714f2477ce6175491f89b6a0502",
@@ -65,10 +72,10 @@
     "BioEntropy_Final_Package/requirements_dev.txt": "8e2044c1200be4452c902db14e704c03d192a52a546ae19549b89da2e11b683b",
     "BioEntropy_Final_Package/requirements_dev_lock.txt": "3128818b8ff42729c907c4e7d3a7284d6168501d53da6228d384e6d40ac55aef",
     "BioEntropy_Final_Package/requirements_lock.txt": "062f0dad5c71a54aabcb837d231d4c49978fc5fa8312ff8dacc715647e2c13ca",
-    "BioEntropy_Final_Package/version_info.txt": "1dd57812530891691ea659174b2fd0d3b573c1a98d86d76ac322ede0c7afee29"
+    "BioEntropy_Final_Package/version_info.txt": "14946fdfdf6de837f495ac81cd8a42d1747c34897817a3e905e3ad2cbe13d90f"
   },
   "supplementary_methods": {
-    "BioEntropy_V1.0_SI_CN.docx": "aedc6195457e7f83a741666b7910f1a6b6005c0d5560199a01daf6ed6fa0a63c",
-    "BioEntropy_V1.0_SI_EN.docx": "598965a7ba97dcc52386dba3ac831cd258104293ff7c9de964bdf0105ea33878"
+    "BioEntropy_V1.0_SI_CN.docx": "23dbc5ff43af193c5d8471d4360f3768549eed076b1a2545323110907d2a650e",
+    "BioEntropy_V1.0_SI_EN.docx": "c2427161ce9fcf6ef137b25b1e477563c9e785d2a298472847233d6f5f9324c3"
   }
 }

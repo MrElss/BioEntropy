@@ -172,12 +172,13 @@ no matching lab (e.g. animal studies) get an empty table and fall back to BRI.
 `NMD` (true enrolled Normal cloud) > `NRBS` (published-range anchor) > `BRI`
 (baseline-relative fallback).
 
-### 3b. Treatment-minus-comparator contrast (main figure 12)
+### 3b. Treatment-minus-comparator contrast (results tables)
 
-Δ = (treatment − comparator) burden per week with 95% CI. The difference cancels
-the shared placebo/standard-of-care drift, isolating the **drug-attributable**
-effect (the controlled clinical estimand). Δ < 0 ⇒ the treatment arm carries
-lower disease burden; per-week Mann–Whitney significance is starred.
+Δ = (treatment − comparator) burden per week with a nominal 95% bootstrap CI.
+Δ < 0 means a lower observed group-average burden in the treatment arm.
+Causal interpretation depends on the study design and assumptions; this
+contrast alone does not adjust for baseline differences or identify a drug effect.
+The results also report per-week Mann–Whitney comparisons.
 
 ## 4. Effect size — Hedges' g (forest module)
 
@@ -220,6 +221,32 @@ study-specific validation. Run manifests record the version, method policy, sour
 and input hashes, and available environment information.
 
 ## 7. Interpretation
+
+### Display and baseline changes
+
+Longitudinal figures 09 and 10 show each group's metric minus that group's
+0W value. When 0W is missing, the earliest valid visit is recorded and used.
+Groups with fewer than two valid visits do not have a change trajectory;
+single-timepoint experiments are not baseline-aligned. These are differences
+between group summaries, without a paired-subject restriction, a new uncertainty
+interval, or an additional treatment-effect test. Raw metrics and existing
+statistical outputs remain unchanged.
+
+For normalized figures, the group curves/bars and disease-deviation subject
+points use the same anchors fitted to that figure's valid group summaries within
+the experiment: distinct Normal/model means when available, otherwise their
+minimum/maximum. Joint views can first require both metrics to be present and
+therefore use a smaller subset than a single-metric view.
+The common linear mapping is clipped to [0,100] and optionally transformed by
+100*(L/100)^3. Single-timepoint normalized state figure 08 uses linear L without
+gamma. A constant reference range gives L=50 (12.5 after the cubic transform).
+Thus a transformed group mean is not generally the mean of the
+transformed points; endpoint values may reflect clipping rather than observed
+normality. Entropy remains a group-level estimate and is displayed without
+individual log-distance points. The normalized group curves retain their prior
+values; the additional baseline-change figures have no gamma transform.
+
+### Scientific interpretation
 
 The distance-derived state score is mathematically coupled to NMD. Their correlation
 does not constitute independent validation. Forest-module log-distance effect sizes
