@@ -1,0 +1,157 @@
+{
+  "106": {
+    "folder": "临床实验106",
+    "longitudinal": true,
+    "source_file": null,
+    "features": [
+      "γ-谷氨酰转肽酶 (U/L)-ADEFF",
+      "丙氨酸氨基转移酶 (U/L)-ADEFF",
+      "低密度脂蛋白胆固醇 (mmol/L)-ADEFF",
+      "天门冬氨酸氨基转移酶 (U/L)-ADEFF",
+      "总胆固醇 (mmol/L)-ADEFF",
+      "甘油三酯 (mmol/L)-ADEFF",
+      "空腹血浆血糖 (mmol/L)-ADEFF",
+      "糖化血红蛋白 (%)-ADLB",
+      "血糖 (mmol/L)-ADLB",
+      "超敏C反应蛋白 (mg/L)-ADEFF",
+      "非高密度脂蛋白胆固醇 (mmol/L)-ADEFF",
+      "高密度脂蛋白胆固醇 (mmol/L)-ADEFF"
+    ],
+    "entropy_features": [
+      "γ-谷氨酰转肽酶 (U/L)-ADEFF",
+      "丙氨酸氨基转移酶 (U/L)-ADEFF",
+      "低密度脂蛋白胆固醇 (mmol/L)-ADEFF",
+      "天门冬氨酸氨基转移酶 (U/L)-ADEFF",
+      "总胆固醇 (mmol/L)-ADEFF",
+      "甘油三酯 (mmol/L)-ADEFF",
+      "空腹血浆血糖 (mmol/L)-ADEFF",
+      "糖化血红蛋白 (%)-ADLB",
+      "血糖 (mmol/L)-ADLB",
+      "超敏C反应蛋白 (mg/L)-ADEFF",
+      "高密度脂蛋白胆固醇 (mmol/L)-ADEFF"
+    ],
+    "nmd_features": [
+      "低密度脂蛋白胆固醇 (mmol/L)-ADEFF",
+      "总胆固醇 (mmol/L)-ADEFF",
+      "甘油三酯 (mmol/L)-ADEFF",
+      "糖化血红蛋白 (%)-ADLB",
+      "血糖 (mmol/L)-ADLB",
+      "超敏C反应蛋白 (mg/L)-ADEFF",
+      "高密度脂蛋白胆固醇 (mmol/L)-ADEFF"
+    ],
+    "normal_features": [
+      "低密度脂蛋白胆固醇 (mmol/L)",
+      "总胆固醇 (mmol/L)",
+      "甘油三酯 (mmol/L)",
+      "糖化血红蛋白（HbA1c）",
+      "血糖 (mmol/L)",
+      "C-反应蛋白",
+      "高密度脂蛋白胆固醇 (mmol/L)"
+    ],
+    "normal_file": "Normal.xlsx",
+    "approved_unit_notes": {
+      "糖化血红蛋白（HbA1c）": "percent as verified in current input",
+      "C-反应蛋白": "mg/L as specified by user; no inferred conversion"
+    },
+    "id_status": "USUBJID read from per-visit files; validated before fitting",
+    "input_format": "per_visit_with_usubjid"
+  },
+  "105": {
+    "folder": "临床实验105",
+    "longitudinal": true,
+    "source_file": null,
+    "features": [
+      "γ-谷氨酰转肽酶 (U/L)-105-ADEFF",
+      "丙氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "低密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "天门冬氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "总胆固醇 (mmol/L)-105-ADEFF",
+      "甘油三酯 (mmol/L)-105-ADEFF",
+      "空腹血浆血糖 (mmol/L)-105-ADEFF",
+      "血糖 (mmol/L)-105-ADLB",
+      "非高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF"
+    ],
+    "entropy_features": [
+      "γ-谷氨酰转肽酶 (U/L)-105-ADEFF",
+      "丙氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "低密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "天门冬氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "总胆固醇 (mmol/L)-105-ADEFF",
+      "甘油三酯 (mmol/L)-105-ADEFF",
+      "空腹血浆血糖 (mmol/L)-105-ADEFF",
+      "血糖 (mmol/L)-105-ADLB",
+      "高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF"
+    ],
+    "nmd_features": [
+      "低密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "总胆固醇 (mmol/L)-105-ADEFF",
+      "甘油三酯 (mmol/L)-105-ADEFF",
+      "血糖 (mmol/L)-105-ADLB",
+      "高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF"
+    ],
+    "normal_features": [
+      "低密度脂蛋白胆固醇 (mmol/L)",
+      "总胆固醇 (mmol/L)",
+      "甘油三酯 (mmol/L)",
+      "血糖 (mmol/L)",
+      "高密度脂蛋白胆固醇 (mmol/L)"
+    ],
+    "normal_file": "Normal.xlsx",
+    "approved_unit_notes": {
+      "糖化血红蛋白（HbA1c）": "percent as verified in current input",
+      "C-反应蛋白": "mg/L as specified by user; no inferred conversion"
+    },
+    "id_status": "USUBJID read from per-visit files; validated before fitting",
+    "input_format": "per_visit_with_usubjid"
+  },
+  "105and106": {
+    "folder": "105and106",
+    "longitudinal": true,
+    "source_file": null,
+    "features": [
+      "γ-谷氨酰转肽酶 (U/L)-105-ADEFF",
+      "丙氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "低密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "天门冬氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "总胆固醇 (mmol/L)-105-ADEFF",
+      "甘油三酯 (mmol/L)-105-ADEFF",
+      "空腹血浆血糖 (mmol/L)-105-ADEFF",
+      "血糖 (mmol/L)-105-ADLB",
+      "非高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF"
+    ],
+    "entropy_features": [
+      "γ-谷氨酰转肽酶 (U/L)-105-ADEFF",
+      "丙氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "低密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "天门冬氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "总胆固醇 (mmol/L)-105-ADEFF",
+      "甘油三酯 (mmol/L)-105-ADEFF",
+      "空腹血浆血糖 (mmol/L)-105-ADEFF",
+      "血糖 (mmol/L)-105-ADLB",
+      "高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF"
+    ],
+    "nmd_features": [
+      "低密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "总胆固醇 (mmol/L)-105-ADEFF",
+      "甘油三酯 (mmol/L)-105-ADEFF",
+      "血糖 (mmol/L)-105-ADLB",
+      "高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF"
+    ],
+    "normal_features": [
+      "低密度脂蛋白胆固醇 (mmol/L)",
+      "总胆固醇 (mmol/L)",
+      "甘油三酯 (mmol/L)",
+      "血糖 (mmol/L)",
+      "高密度脂蛋白胆固醇 (mmol/L)"
+    ],
+    "normal_file": "Normal.xlsx",
+    "approved_unit_notes": {
+      "糖化血红蛋白（HbA1c）": "percent as verified in current input",
+      "C-反应蛋白": "mg/L as specified by user; no inferred conversion"
+    },
+    "id_status": "USUBJID read from per-visit files; validated before fitting",
+    "input_format": "per_visit_with_usubjid"
+  }
+}

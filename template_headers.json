@@ -1,0 +1,98 @@
+{
+  "105": {
+    "study": [
+      "Group",
+      "Sample ID",
+      "γ-谷氨酰转肽酶 (U/L)-105-ADEFF",
+      "丙氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "低密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "天门冬氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "总胆固醇 (mmol/L)-105-ADEFF",
+      "甘油三酯 (mmol/L)-105-ADEFF",
+      "空腹血浆血糖 (mmol/L)-105-ADEFF",
+      "糖化血红蛋白 (%)-105-ADLB",
+      "血糖 (mmol/L)-105-ADLB",
+      "超敏C反应蛋白 (mg/L)-105-ADEFF",
+      "非高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "BMI_体重指数",
+      "WHTR_腰高比",
+      "USUBJID"
+    ],
+    "normal": [
+      "健康人ID",
+      "血糖 (mmol/L)",
+      "总胆固醇 (mmol/L)",
+      "甘油三酯 (mmol/L)",
+      "高密度脂蛋白胆固醇 (mmol/L)",
+      "低密度脂蛋白胆固醇 (mmol/L)",
+      "C-反应蛋白",
+      "糖化血红蛋白（HbA1c）",
+      "血红蛋白"
+    ]
+  },
+  "106": {
+    "study": [
+      "Group",
+      "Sample ID",
+      "γ-谷氨酰转肽酶 (U/L)-ADEFF",
+      "丙氨酸氨基转移酶 (U/L)-ADEFF",
+      "低密度脂蛋白胆固醇 (mmol/L)-ADEFF",
+      "天门冬氨酸氨基转移酶 (U/L)-ADEFF",
+      "总胆固醇 (mmol/L)-ADEFF",
+      "甘油三酯 (mmol/L)-ADEFF",
+      "空腹血浆血糖 (mmol/L)-ADEFF",
+      "糖化血红蛋白 (%)-ADLB",
+      "血糖 (mmol/L)-ADLB",
+      "超敏C反应蛋白 (mg/L)-ADEFF",
+      "非高密度脂蛋白胆固醇 (mmol/L)-ADEFF",
+      "高密度脂蛋白胆固醇 (mmol/L)-ADEFF",
+      "BMI_体重指数",
+      " WHTR_腰高比",
+      "USUBJID"
+    ],
+    "normal": [
+      "健康人ID",
+      "血糖 (mmol/L)",
+      "总胆固醇 (mmol/L)",
+      "甘油三酯 (mmol/L)",
+      "高密度脂蛋白胆固醇 (mmol/L)",
+      "低密度脂蛋白胆固醇 (mmol/L)",
+      "C-反应蛋白",
+      "糖化血红蛋白（HbA1c）",
+      "血红蛋白"
+    ]
+  },
+  "105and106": {
+    "study": [
+      "Group",
+      "Sample ID",
+      "γ-谷氨酰转肽酶 (U/L)-105-ADEFF",
+      "丙氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "低密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "天门冬氨酸氨基转移酶 (U/L)-105-ADEFF",
+      "总胆固醇 (mmol/L)-105-ADEFF",
+      "甘油三酯 (mmol/L)-105-ADEFF",
+      "空腹血浆血糖 (mmol/L)-105-ADEFF",
+      "糖化血红蛋白 (%)-105-ADLB",
+      "血糖 (mmol/L)-105-ADLB",
+      "超敏C反应蛋白 (mg/L)-105-ADEFF",
+      "非高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "高密度脂蛋白胆固醇 (mmol/L)-105-ADEFF",
+      "BMI_体重指数",
+      "WHTR_腰高比",
+      "USUBJID"
+    ],
+    "normal": [
+      "健康人ID",
+      "血糖 (mmol/L)",
+      "总胆固醇 (mmol/L)",
+      "甘油三酯 (mmol/L)",
+      "高密度脂蛋白胆固醇 (mmol/L)",
+      "低密度脂蛋白胆固醇 (mmol/L)",
+      "C-反应蛋白",
+      "糖化血红蛋白（HbA1c）",
+      "血红蛋白"
+    ]
+  }
+}
